@@ -1,0 +1,257 @@
+/* 
+Cascading style sheet (CSS) that controls the appearance of the SVG
+airmass plots produced by plot_airmass.cgi.  The bulk of the style was
+copied from the source code for SVG::TT::Graph (which has an internal,
+default stylesheet) and then some changes were made to tweak the
+plots.  line1 controls the appearance of the airmass line, and line2
+and line3 are the lines the show the sunset and sunrise times.
+*/
+
+.svgBackground{
+  fill:#ffffff;
+}
+
+/* The actual blue_fade gradient for the graph background is */
+/* calculated by the script at run time and output into the document. */
+
+.graphBackground{
+  fill: url(#blue_fade);
+}
+
+.transitRectMouseOut{
+  fill:rgb(0,255,0);
+  fill-opacity: 0.12;
+}
+
+.transitRectMouseIn{
+  fill:rgb(0,64,0);
+}
+
+.transitRectMouseIn_inverted{
+  fill:rgb(0,128,0);
+}
+
+.transitLabel{
+  fill:white;
+}
+
+.transitLabel_inverted{
+  fill: black;
+}
+
+.transit_group{
+  pointer-events: all;
+  opacity: 0;
+  fill-opacity: 0;
+}
+
+.transit_group:hover{
+  opacity: 0.8;
+  fill-opacity: 0.8;
+}
+
+/* graphs titles */
+.mainTitle{
+  text-anchor: middle;
+  fill: #000000;
+  font-size: 14px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+.subTitle{
+  text-anchor: middle;
+  fill: #999999;
+  font-size: 12px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.axis{
+  stroke: #000000;
+  stroke-width: 1px;
+}
+
+.guideLines{
+  stroke: #666666;
+  stroke-width: 1px;
+  stroke-dasharray: 3 10;
+}
+
+.xAxisLabels{
+  text-anchor: middle;
+  fill: #000000;
+  font-size: 12px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.yAxisLabels{
+  text-anchor: end;
+  fill: #000000;
+  font-size: 12px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.xAxisTitle{
+  text-anchor: middle;
+  fill: #555555;
+  font-size: 14px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.yAxisTitle{
+  fill: #555555;
+  text-anchor: middle;
+  font-size: 14px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.dataPointLabel{
+  fill: #dddddd;
+  text-anchor:middle;
+  font-size: 14px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
+.dataPointLabel1{
+  fill: #dddddd;
+}
+
+.dataPointLabel1_inverted{
+  fill: #333333;
+}
+
+.staggerGuideLine{
+  fill: none;
+  stroke: #000000;
+  stroke-width: 0.5px;  
+}
+
+             
+  .fill1{
+    fill: gold;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+
+  .line1{
+    fill: none;
+    stroke: gold;
+    stroke-width: 1px;
+  }
+
+  .line1_inverted{
+    fill: none;
+    stroke: DarkSlateBlue;
+    stroke-width: 1px;
+  }
+
+  .key1,.fill1{
+    fill: gold;
+    stroke: none;
+    stroke-width: 1px;
+  }
+
+               
+  .fill2{
+    fill: #7D0541;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+
+  .line2{
+    fill: none;
+    stroke: #7D0541;
+    stroke-width: 1px;
+  }
+
+  .line2_inverted{
+    fill: none;
+    stroke: Purple;
+    stroke-width: 1px;
+  }
+
+  .key2,.fill2{
+    fill: #7D0541;
+    stroke: none;
+    stroke-width: 1px;
+  }
+
+               
+  .fill3{
+    fill: #7D0541;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+
+  .line3{
+    fill: none;
+    stroke: #7D0541;
+    stroke-width: 1px;
+  }
+
+  .line3_inverted{
+    fill: none;
+    stroke: Purple;
+    stroke-width: 1px;
+  }
+
+  .key3,.fill3{
+    fill: #7D0541;
+    stroke: none;
+    stroke-width: 1px;
+  }
+
+               
+  .fill4{
+    fill: #00AB66;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+
+  .line4{
+    fill: none;
+    stroke: #00AB66;
+    stroke-width: 1.5px;
+    stroke-dasharray: 8 2;
+  }
+
+  .key4,.fill4{
+    fill: #00AB66;
+    stroke: none;
+    stroke-width: 1px;
+  }
+
+               
+  .fill5{
+    fill: #00AB66;
+    fill-opacity: 0.2;
+    stroke: none;
+  }
+
+  .line5{
+    fill: none;
+    stroke: #00AB66;
+    stroke-width: 1.5px;
+    stroke-dasharray: 8 2;
+  }
+
+  .key5,.fill5{
+    fill: #00AB66;
+    stroke: none;
+    stroke-width: 1px;
+  }
+
+  
+.keyText{
+  fill: #000000;
+  text-anchor:start;
+  font-size: 10px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+/* End copy for external style sheet */

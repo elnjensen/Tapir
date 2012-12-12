@@ -1,0 +1,198 @@
+
+<h3>Results shown for <TMPL_VAR NAME="observatory_name">
+latitude = <TMPL_VAR NAME="observatory_latitude">, 
+longitude = <TMPL_VAR NAME="observatory_longitude">.
+</h3>
+
+<p>
+Colored text indicates <span style="color:MediumVioletRed">
+an ingress or egress during daylight</span> or one 
+<span style="color:Red">at low elevation</span>.
+</p>
+
+
+<table border="1" cellpadding="5">
+	<tr>
+	  <th> Local evening date </th>
+          <th> Name </th>
+	  <th> V mag </th>
+	  <th> Start&mdash;<br>Mid<br> &mdash;End </th>
+	  <th> Duration </th>
+	  <th> JD start-mid-end </th>
+	  <th> Elev. at start, mid, end </th>
+	  <th> RA &amp; Dec (J2000) </th>
+	  <th> Depth (mmag) </th>
+	  <th> Comments </th>
+	</tr>
+
+<TMPL_LOOP NAME="eclipse_info">
+   <TMPL_IF EXPR="similar_count > 0">
+   <tr border="0">   
+     <td colspan="10" border="0" style="background-color: #EEEEEE">
+	  </td> 
+   </tr> 
+   </TMPL_IF>
+
+ <tr>
+   <TMPL_IF EXPR="similar_count > 0">   
+     <td rowspan=<TMPL_VAR NAME="similar_count"> align="center"> 
+       <TMPL_VAR NAME="sunset_local_date">    
+	<TMPL_IF EXPR="timezone eq 'UTC'"> (local)</TMPL_IF><p> Nautical<br>twilight<br> <TMPL_VAR NAME="sunset_time"> - <TMPL_VAR NAME="sunrise_time"> (<TMPL_VAR
+     NAME="timezone">)
+ </td> 
+   </TMPL_IF>
+   <td width="250"><TMPL_VAR NAME="name"></a>
+
+<br>Finding charts: 
+  <TMPL_IF EXPR="finding_chart">
+  <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
+  <a href="http://server1.sky-map.org/v2?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2">
+SkyMap</a>;
+<br>Info: <TMPL_IF EXPR="target_page">
+<a href="<TMPL_VAR NAME="target_page">"><TMPL_VAR NAME="target_page_label"></a>,
+</TMPL_IF> 
+<a
+  href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Radius=2&Radius.unit=arcmin&Coord=<TMPL_VAR
+  NAME="coords">">Simbad</a>,
+
+<a
+href="http://vizier.hia.nrc.ca/viz-bin/asu-acl?-source=II/246&-c=<TMPL_VAR
+NAME="coords">&-c.rm=2&-sort=_r&-out=_RA,_DE,Jmag,Hmag,Kmag,Qflg,_r">2MASS</a>;
+<br><a
+href="plot_airmass.cgi?observatory_string=<TMPL_VAR
+NAME="observatory_string">&observatory_latitude=<TMPL_VAR
+NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
+NAME="observatory_longitude">&target=<TMPL_VAR
+NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
+NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
+NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
+NAME="jd_end">&use_utc=<TMPL_VAR NAME="use_utc">">Airmass plot</a>
+
+</td>
+
+<td align="center"> <TMPL_VAR NAME="vmag"> </td>
+ <td align="center"> 
+    <span 
+    <TMPL_IF EXPR="starts_before_sunset"> 
+       style="color:MediumVioletRed" 
+    </TMPL_IF> 
+      ><TMPL_VAR NAME="start_time"></span>&mdash;<br>
+    <span 
+    <TMPL_IF EXPR="middle_in_daytime"> 
+       style="color:MediumVioletRed" 
+    </TMPL_IF> 
+    ><TMPL_VAR NAME="mid_time"></span><br>
+    &mdash;<span 
+        <TMPL_IF EXPR="ends_after_sunrise"> 
+           style="color:MediumVioletRed" 
+        </TMPL_IF> 
+            ><TMPL_VAR NAME="end_time"></span> 
+  </td>
+
+<td align="center"> <TMPL_VAR NAME="duration"> </td>
+
+<td align="center"> 
+    <TMPL_VAR NAME="jd_start"><br> <TMPL_VAR NAME="jd_mid"><br> 
+    <TMPL_VAR NAME="jd_end"> </td>
+
+<td align="center">
+   <span <TMPL_IF EXPR="start_el < 30"> style="color:red"  
+         </TMPL_IF> > 
+	 <TMPL_VAR NAME="start_el">&deg;</span>,
+   <span <TMPL_IF EXPR="mid_el < 30"> style="color:red" 
+         </TMPL_IF> > 
+         <TMPL_VAR NAME="mid_el">&deg;</span>,
+   <span <TMPL_IF EXPR="end_el < 30"> style="color:red"  
+         </TMPL_IF> > 
+         <TMPL_VAR NAME="end_el">&deg;</span>
+</td>
+
+<td align="center"> <TMPL_VAR NAME="coords"> </td>
+<td align="center"> <TMPL_VAR NAME="depth"> </td>
+<td align="left" > <TMPL_VAR NAME="comments"> </td>
+
+</tr>
+
+</TMPL_LOOP>
+
+</table>
+
+<TMPL_IF EXPR="non_eclipse_target_count > 0">
+<p>&nbsp;</p>
+<p />
+<hr>
+<p>&nbsp;</p>
+<p />
+<h2>Targets for out-of-transit observations</h2>
+<h3>Note: these may transit, too, so check the transit times 
+above to ensure you are observing out of transit.
+</h3>
+<p />
+<table border="1" cellpadding="5">
+	<tr>
+          <th> Name </th>
+	  <th> V mag </th>
+	  <th> Peak night-time elevation </th>
+	  <th> Time of peak elevation </th>
+	  <th> RA &amp; Dec (J2000) </th>
+	  <th> Comments </th>
+	</tr>
+
+<TMPL_LOOP NAME="non_eclipse_info">
+<tr>
+
+<td width="250"><TMPL_VAR NAME="name"></a>
+
+<br>Finding charts: 
+  <TMPL_IF EXPR="finding_chart">
+  <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
+  <a href="http://server1.sky-map.org/v2?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2">
+SkyMap</a>;
+<br>Info: <TMPL_IF EXPR="target_page">
+<a href="<TMPL_VAR NAME="target_page">"><TMPL_VAR NAME="target_page_label"></a>,
+</TMPL_IF> 
+<a
+  href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Radius=2&Radius.unit=arcmin&Coord=<TMPL_VAR
+  NAME="coords">">Simbad</a>,
+
+<a
+href="http://vizier.hia.nrc.ca/viz-bin/asu-acl?-source=II/246&-c=<TMPL_VAR
+NAME="coords">&-c.rm=2&-sort=_r&-out=_RA,_DE,Jmag,Hmag,Kmag,Qflg,_r">2MASS</a>;
+<br><a
+href="plot_airmass.cgi?observatory_string=<TMPL_VAR
+NAME="observatory_string">&observatory_latitude=<TMPL_VAR
+NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
+NAME="observatory_longitude">&target=<TMPL_VAR
+NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
+NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
+NAME="sunset_jd">&use_utc=<TMPL_VAR NAME="use_utc">">Airmass plot</a>
+
+</td>
+
+<td align="center"> <TMPL_VAR NAME="vmag"> </td>
+
+<td align="center"> <TMPL_VAR NAME="max_elevation">&deg; </td>
+<td align="center"> <TMPL_VAR NAME="max_elevation_time"> </td>
+<td align="center"> <TMPL_VAR NAME="coords"> </td>
+<td align="left"> <TMPL_VAR NAME="comments"> </td>
+
+</tr>
+</TMPL_LOOP>
+
+</table>
+
+</TMPL_IF>
+
+<TMPL_IF EXPR="show_ephemeris == 1">
+<h3>  The above transit predictions are based on the 
+      following input ephemerides: 
+</h3>
+<pre>
+   <TMPL_LOOP NAME="eclipse_input_data">
+	<TMPL_VAR NAME="line">
+   </TMPL_LOOP>
+</pre>
+</TMPL_IF>
+
+<p>&nbsp;</p>
+<p />

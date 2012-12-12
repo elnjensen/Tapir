@@ -1,0 +1,96 @@
+/* Style sheet that controls the appearance of the various input
+forms, like airmass.cgi, finding_charts.cgi, and transits.cgi. 
+*/
+
+body {
+	width: 700px;
+	margin:10px 50px 50px 20px;
+	padding:10px;
+	background-color:white;
+	}
+h1 {
+	margin:0px 0px 15px 0px;
+	padding:0px;
+	font-size:24px;
+	line-height:30px;
+	font-weight:900;
+	color:#999;
+	}
+h2 {
+	margin:0px 0px 15px 0px;
+	padding:0px;
+	font-size:18px;
+	line-height:28px;
+	font-weight:900;
+	color:#99b;
+	}
+h3 {
+	margin:10px 0px 0px 0px;
+	padding:0px;
+	font-size:18px;
+	line-height:28px;
+	font-weight:900;
+	color:#99b;
+	}
+p {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	margin:0px 0px 16px 0px;
+                   line-height:20px;
+	padding:0px;
+	}
+
+/* Just like paragraph, but for <div>s where we don't 
+	want a paragraph break. */
+.p-style {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	margin:0px 0px 16px 0px;
+                   line-height:20px;
+	padding:0px;
+	}
+
+
+address {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	margin:0px 0px 16px 0px;
+                   line-height:20px;
+	padding:0px;
+	}
+
+ul {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	}
+td {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	margin:0px 0px 16px 0px;
+	font-weight:500;
+        padding:0px;
+        text-align:right;
+	}
+input {
+	text-align:right;
+	padding-right:2px
+	}
+
+a {
+	color:#6699cc;
+	font-size:14px;
+	text-decoration:none;
+	font-family:verdana, arial, helvetica, sans-serif;
+	}
+a:link {color:#6699cc;}
+a:visited {color:#336699;}
+a:hover {text-decoration:underline;}
+
+#content {
+                   color:#333;
+                   font-family:verdana, arial, helvetica, sans-serif;
+	}
+
+#quote {
+	font:14px/20px verdana, arial, helvetica, sans-serif;
+	margin:5px 0px 5px 20px;
+                   line-height:20px;
+	padding:0px;
+	}
+
+
