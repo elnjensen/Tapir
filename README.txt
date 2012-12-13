@@ -1,4 +1,8 @@
-Big picture:
+A longer description, and links to examples of the code in use
+(including interfaces for plotting transit visibility, making airmass
+plots, and making finding charts) can be found at
+http://astro.swarthmore.edu/~jensen/tapir.html .
+
 
 There are two main parts to the software: the form that accepts the
 input parameters (observing location, any constraints), and the code
@@ -6,7 +10,7 @@ that takes this input, calculates the visibility of events, and
 generates the output.  In addition, there are some supporting files,
 notably a few style sheets (.css files) and an HTML template file
 (.tmpl) that control the appearance of the output.  In addition, there
-is separate code that generates the airmass plots. 
+is separate code that generates the airmass plots and finding charts. 
 
 Prerequisites:
 
