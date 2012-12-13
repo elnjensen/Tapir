@@ -51,7 +51,6 @@ If you use the script for fetching a Google docs spreadsheet, you'll
 need Net::Google::Spreadsheets, and if you use the script for parsing
 the exoplanets.org CSV file, you'll need Tie::Handle::CSV. 
 
-
 If you want to have a nice pop-up calendar widget for selecting dates
 in the interface for specifying the date range to be considered, you
 can download and install the Date-Picker widget from
@@ -75,9 +74,12 @@ default.
 To use a different localization, change the call in the header of the
 input form to load a different language file from that subdirectory. 
 
+If you run the code for creating finding charts, you'll need the tools
+'convert' and 'identify' from ImageMagick to be installed and in your
+path. 
+
 
 Setup:
-
 
 For the input form, there shouldn't be much setup needed - just put it
 in the same directory as the other files.  If you change the name of
@@ -146,6 +148,7 @@ times as necessary, with the values filled in for a particular target.
 There is an HTML::Template tutorial at
 http://www.perlmonks.org/?node_id=65642 .
 
+
 Utility scripts and files included:
 
 get_finding_charts.pl: this standalone script is used to produce the
@@ -198,6 +201,25 @@ transit-plotting code.  URL for the CSV file is
 http://exoplanets.org/csv/exoplanets.csv
 
 airmass.ico: small icon file displayed with the airmass plots.
+
+
+Copying: 
+
+This code is free software, and it is released under the terms of the
+GNU General Public License.  See the file COPYING.txt for more
+details. 
+
+
+Acknowledgments:
+
+Many thanks to the authors of various packages that made this work
+possible, especially Tim Jenness for Astro::Coords, Astro::Telescope,
+and Astro::PAL, and the various contributors to the DateTime and
+HTML::Template packages. 
+
+Thanks to Jason Wright and his team for the exoplanets.org database,
+and to STScI for providing access to the Digitized Sky Survey. 
+
 
 Feedback:
 

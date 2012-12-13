@@ -581,11 +581,17 @@ expect):<br />
 This page uses input ephemeris data from <a
 href="http://exoplanets.org/">exoplanets.org</a>, maintained by Jason
 Wright.</p>
+
 <p>
 This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  The
-underlying source code will be publicly available soon.
+href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+tool is part of <a
+href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+package</a> for planning astronomical observations; the <a
+href="https://github.com/elnjensen/Tapir">source code</a> is
+freely available.  
 </p>
+
 <p>
 Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"

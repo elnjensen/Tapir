@@ -28,7 +28,11 @@
 # along with this program, in the file COPYING.txt.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-
+# The finding charts provided here make use of images from the
+# Digitized Sky Survey, which are subject to the copyright summary at
+# http://archive.stsci.edu/dss/copyright.html.  Please consider
+# acknowledging their use in your work, as described at
+# http://archive.stsci.edu/dss/acknowledging.html.
 
 
 # Requirements:

@@ -171,12 +171,24 @@ Detector height (arcmin): <INPUT TYPE="text" name="detector_height" size="2"
 <INPUT TYPE="submit" VALUE="Submit">
 </p>
 </FORM>
-<p>
+
+<p> The finding charts provided here make use of images from the Digitized Sky
+Survey, which are subject to the copyright in <a
+href="http://archive.stsci.edu/dss/copyright.html">this copyright summary</a>.
+Please consider <a
+href="http://archive.stsci.edu/dss/acknowledging.html">acknowledging</a> their
+use in your work.  </p>
+
 <p>
 This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  The
-underlying source code will be publicly available soon.
+href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+tool is part of <a
+href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+package</a> for planning astronomical observations; the <a
+href="https://github.com/elnjensen/Tapir">source code</a> is
+freely available.  
 </p>
+
 <p>
 Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on finding chart form"

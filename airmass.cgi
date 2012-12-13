@@ -525,12 +525,15 @@ Dec (J2000): <INPUT TYPE="text" name="dec">
 <INPUT TYPE="submit" VALUE="Submit">
 </p>
 </FORM>
-<p>
-<p>
-This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  The
-underlying source code will be publicly available soon.
-</p>
+
+<p> This page was created by <a
+href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+tool is part of <a
+href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+package</a> for planning astronomical observations; the <a
+href="https://github.com/elnjensen/Tapir">source code</a> is
+freely available.  </p>
+
 <p>
 Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on airmass form"
