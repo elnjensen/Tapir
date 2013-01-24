@@ -48,7 +48,7 @@ use warnings;
 
 # Set the -d flag ("debug") for verbose output of (some) problems.
 
-my ($opt_d, $DEBUG);
+our ($opt_d, $DEBUG);
 
 my $options = 'd';
 
