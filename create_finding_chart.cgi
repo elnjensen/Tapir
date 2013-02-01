@@ -64,6 +64,10 @@ push @cookies, define_cookie('invert',
 
 my $target_name;
 
+# Choose an alternate Vizier mirror if one isn't working:
+my $vizier_mirror = "http://cdsweb.u-strasbg.fr/cgi-bin/";
+#my $vizier_mirror = "http://vizier.cfa.harvard.edu/viz-bin/";
+
 if (($ra eq '') and ($target_input ne '')) {
     # No RA given, try to resolve name with Simbad:
     # First vet the name against a regular expression; since we pass
@@ -73,18 +77,19 @@ if (($ra eq '') and ($target_input ne '')) {
 	$target_name = $1;
 	# Convert spaces in the name to underscores:
 	$target_name =~ s/ +/_/g;
-	my $simbad_url
-	    = "http://vizier.cfa.harvard.edu/viz-bin/nph-sesame/" 
+	my $simbad_url = $vizier_mirror . "nph-sesame/" 
 	    . "-oxp/SN?${target_name}";
 	my $simbad_output = get($simbad_url);
 
 	# Try to match a pattern in the output to get coords:
 	if ($simbad_output 
-	    !~ m%<jpos>(\d\d:\d\d:\d\d\.?\d*)\s+
-	               ([+-]?\d\d:\d\d:\d\d\.?\d*)</jpos>%x) { 
+	    !~ m%<jpos>\s*(\d\d:\d\d:\d\d\.?\d*)\s+
+	               ([+-]?\d\d:\d\d:\d\d\.?\d*)\s*</jpos>%x) { 
 	    my $err_title =  "Error - no coordinates";
 	    my $err_message = "No RA given and could not parse/resolve"
-		. "name: $target_input";
+		. " name: $target_input \n"
+		. "<p> The output from Vizier was: "
+		. "<pre> $simbad_output </pre>" ;
 	    fatal_error($err_title, $err_message);
 	} else {
 	    $ra = $1;

@@ -355,9 +355,9 @@ if (scalar(@fields) < 3) {
     }
     my $simbad_output = get($simbad_url);
     # The line with "<jpos>" is the one we want for coords:
-    if (not $simbad_output =~
-	m%<jpos>(\d\d):(\d\d):(\d\d\.\d\d)\s+
-	        ([+-]?\d\d):(\d\d):(\d\d\.\d)</jpos>%x) {
+    if ($simbad_output 
+	!~ m%<jpos>\s*(\d\d:\d\d:\d\d\.?\d*)\s+
+	         ([+-]?\d\d:\d\d:\d\d\.?\d*)\s*</jpos>%x) { 
 	print STDERR "Could not parse/resolve input line: \n$original_input";
 	next;
     } else {
