@@ -31,6 +31,15 @@ use warnings;
 
 use Net::Google::Spreadsheets;
 
+# Two important things to note about setting up your Google
+# spreadsheet, both of which are set by the Google API (not coding
+# choices here):  (1) The first row of the spreadsheet is a header
+# row, and the entries in this row set the variable names returned for
+# each column; see the example spreadsheet included
+# (example_target_spreadsheet.csv); (2) a blank row in the spreadsheet
+# is taken to be the end of the data stream, i.e. if you have a blank
+# row in your sheet, no subsequent rows of data will be returned. 
+
 # Login credentials need to be passed in; be careful about who has
 # read access to this file, and/or re-write to ask for these
 # credentials at run time.  Note that you do not have to store this in
