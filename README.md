@@ -67,7 +67,7 @@ it is installed in a subdirectory called `src` below the directory
 where the form is installed.  To use, just unpack the zip file into
 that `src` subdirectory, and make sure everything is readable by users
 of your webserver:
-```chmod -R o+rx src/```
+`chmod -R o+rx src/`
 
 For my own installation, I also edited the file
 `src/date-picker-v5/js/lang/en.js` to make Sunday be displayed as the
@@ -165,13 +165,13 @@ it create new finding charts as new targets are added.  Make the file
 executable (chmod +x get_finding_charts.pl) and run it with the --help
 switch to see the usage details and options. 
 
-`finding_charts.cgi` and create_finding_chart.cgi: these provide a
+`finding_charts.cgi` and `create_finding_chart.cgi`: these provide a
 standalone web interface to the script mentioned in the previous
 entry, for creating finding charts.  See
 http://astro.swarthmore.edu/finding_charts.cgi for an example.  If you
 want to avoid generating and storing local copies of finding charts
 for your targets, you could replace the links in the default HTML
-template to links that call create_finding_chart.cgi with appropriate
+template to links that call `create_finding_chart.cgi` with appropriate
 parameters, to generate them on-the-fly as needed (though this will be
 slower than having a chart already created and stored). 
 
