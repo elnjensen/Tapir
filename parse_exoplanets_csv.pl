@@ -2,7 +2,7 @@
 
 # Script to parse the CSV file of exoplanets from exoplanets.org.
 
-# Copyright 2012 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -36,10 +36,12 @@
 # remote file to be fetched only if it is newer than the local copy. 
 
 # cd /home/httpd/html/ ; \ 
-# wget -N http://exoplanets.org/csv/exoplanets.csv  2>&1 ;  \
+# wget -N http://exoplanets.org/csv-files/exoplanets.csv  2>&1 ;  \
 #  ./parse_exoplanets_csv.pl exoplanets.csv > transit_targets.txt 
 
 # Initial creation, Eric Jensen, ejensen1@swarthmore.edu
+# Updated 2016-11-17 to force UTF-8 encoding in opening CSV file, 
+#                    and require coordinates for targets. 
 
 use Tie::Handle::CSV;
 use Getopt::Std;
@@ -60,11 +62,11 @@ if ($opt_d) {
     $DEBUG = 0;
 }
 
-# my $datafile = '/home/httpd/html/telescope/exoplanets.csv';
 my $datafile = $ARGV[0];
 my $fh = Tie::Handle::CSV->new(csv_parser =>
 			       Text::CSV_XS->new({allow_whitespace => '1'}),
 			       file => $datafile, 
+			       open_mode => "< :encoding(UTF8)",
 			       header => 1,
 			       );
 
@@ -80,16 +82,39 @@ my ($csv_line, $V, $comment, $priority, $name, $duration,
     while ($csv_line = <$fh>) {
 	# Only consider transiting objects:
 	if ($csv_line->{'TRANSIT'} eq '1') {
+	    $name =  $csv_line->{'NAME'};
+	    if ($DEBUG) {
+		print STDERR "Doing planet $name...\n"
+	    }
+	    
 	    $comment = '';
+
+	    # No coords are listed for most of the KOI objects;
+	    # don't include objects in the output if they don't have
+	    # coords:
+	    if ( ($csv_line->{'RA_STRING'} =~ /^\s*$/) or
+		 ($csv_line->{'DEC_STRING'} =~ /^\s*$/) ) {
+
+		if ($DEBUG) {
+		    print STDERR "No coords available for $name, skipping.\n"
+		}
+	    
+		next PLANETS;
+	    }
+
+
 	    # Priority not really used now - set all to the same.
 	    $priority = 5;
-	    $name =  $csv_line->{'NAME'};
-	    # Get the V mag:
-	    if ($csv_line->{'V'} eq '') {
-		$V = -99; 
-	    } else {
+
+	    # Get the V mag, or use Kepler mag if V not present:
+	    if ($csv_line->{'V'} ne '') {
 		$V = sprintf("%0.2f",  $csv_line->{'V'});
+	    } elsif ($csv_line->{'KP'} ne '') {
+		$V = sprintf("%0.2f",  $csv_line->{'KP'});
+	    } else {
+		$V = -99; 
 	    }
+
 	    # If the time of transit is not given, we don't 
 	    # include this object, since we wouldn't be able
 	    # to calculate when it transits:
@@ -100,9 +125,6 @@ my ($csv_line, $V, $comment, $priority, $name, $duration,
 	    # Get the duration; called "T14" in the CSV file because
 	    # it is from 1st to 4th contact.
 	    $duration = $csv_line->{'T14'};
-	    if ($DEBUG) {
-		print STDERR "Doing planet $name...\n"
-		}
 	    if ($duration eq '') {
 		# No duration given; try to estimate from other
 	        # parameters, using formula of equation 16 of Seager &
@@ -153,6 +175,11 @@ my ($csv_line, $V, $comment, $priority, $name, $duration,
 	    }
 	    $depth_mmag_string = sprintf('%0.1f', $depth_mmag);
 	    $duration_hours = sprintf('%0.2f', 24. * $duration);
+
+	    # The RA string has some spurious leading plus signs on
+	    # some entries, remove: 
+	    $csv_line->{'RA_STRING'} =~ s/^\+//;
+
 	    # Print the final output line:
 	    print $name . $sep . $csv_line->{'RA_STRING'}
 	    . $sep . $csv_line->{'DEC_STRING'} . $sep . $V

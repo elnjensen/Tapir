@@ -15,7 +15,7 @@ an ingress or egress during daylight</span> or one
 	<tr>
 	  <th> Local evening date </th>
           <th> Name </th>
-	  <th> V mag </th>
+	  <th> V or<br/> Kepler<br/> mag </th>
 	  <th> Start&mdash;<br>Mid<br> &mdash;End </th>
 	  <th> Duration </th>
 	  <th> JD start-mid-end </th>
@@ -37,7 +37,7 @@ an ingress or egress during daylight</span> or one
    <TMPL_IF EXPR="similar_count > 0">   
      <td rowspan=<TMPL_VAR NAME="similar_count"> align="center"> 
        <TMPL_VAR NAME="sunset_local_date">    
-	<TMPL_IF EXPR="timezone eq 'UTC'"> (local)</TMPL_IF><p> Nautical<br>twilight<br> <TMPL_VAR NAME="sunset_time"> - <TMPL_VAR NAME="sunrise_time"> (<TMPL_VAR
+	<TMPL_IF EXPR="timezone eq 'UTC'"> (local)</TMPL_IF><p> Nautical<br>twilight<br> <TMPL_VAR NAME="sunset_time"> - <TMPL_VAR NAME="sunrise_time"><br/> (<TMPL_VAR
      NAME="timezone">)
  </td> 
    </TMPL_IF>
