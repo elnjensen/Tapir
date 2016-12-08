@@ -2,7 +2,7 @@
 
 # Web interface to provide a form for calculating transit visibility. 
 
-# Copyright 2012 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -26,6 +26,7 @@
 
 use CGI;
 use CGI::Cookie;
+use Math::Trig;
 
 use warnings;
 use strict;
@@ -54,7 +55,7 @@ $n_planets =~ s/^\s*(\d+) .*$/$1/;
 my ($observatory_string, $observatory_latitude, $observatory_longitude,
     $observatory_timezone, $days_to_print, $days_in_past, $minimum_elevation,
     $minimum_start_end_elevation, $minimum_depth, $minimum_priority,
-    $use_utc,
+    $use_utc, $use_AND, $twilight, $max_airmass, $min_plot_el,
     );
 
 
@@ -99,6 +100,14 @@ if (not defined $use_utc) {
     $use_utc = 0;
 }
 
+
+if (defined $cookies{'Use_AND'}) {
+    $use_AND = $cookies{'Use_AND'}->value;
+}
+if (not defined $use_AND) {
+    $use_AND = 0;
+}
+
 if (defined $cookies{'days_to_print'}) {
     $days_to_print = $cookies{'days_to_print'}->value;
 }
@@ -141,6 +150,26 @@ if (defined $cookies{'minimum_priority'}) {
 if (not defined $minimum_priority) {
     $minimum_priority = 0;
 }
+
+# Setting of Sun elevation that defines night:
+if (defined $cookies{'twilight'}) {
+    $twilight = $cookies{'twilight'}->value;
+}
+if (not defined $twilight) {
+    $twilight = -12;
+}
+
+# Setting of maximum airmass to plot:
+if (defined $cookies{'max_airmass'}) {
+    $max_airmass = $cookies{'max_airmass'}->value;
+}
+if (not defined $max_airmass) {
+    $max_airmass = 2.4;
+}
+
+# Find elevation equivalent of the max airmass:
+$min_plot_el = sprintf("%0.1f", 90 - rad2deg(asec($max_airmass)));
+
 
 # If no cookie was set in one or more cases, then the above variables
 # have all been given sensible defaults by now, so some starting
@@ -569,10 +598,18 @@ href="http://www.google.com/support/calendar/bin/answer.py?hl=en&answer=37118">
 import into Google Calendar.)</a></p>
 <p>
 Show the input ephemeris data used to generate the target list (useful
-for debugging if a particular target isn't showing up as you
+for debugging if a particular target isn\'t showing up as you
 expect):<br />
 <INPUT TYPE="radio" NAME="show_ephemeris" VALUE="0" Checked/> No <br />
 <INPUT TYPE="radio" NAME="show_ephemeris" VALUE="1"/> Yes <br />
+
+<p>Maximum airmass to show in airmass plots: &nbsp;
+
+ <INPUT NAME="max_airmass" VALUE="$max_airmass" size="4" /> 
+<br /> (Current airmass value of $max_airmass is elevation of $min_plot_el degrees.)
+</p>
+
+
 <p>
 <INPUT TYPE="submit" VALUE="Submit">
 </FORM></p>
