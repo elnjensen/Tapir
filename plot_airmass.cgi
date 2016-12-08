@@ -225,12 +225,14 @@ my $target = new Astro::Coords( ra => $ra,
 				type => 'J2000',
 				);
 
-if (not defined($target)) {
+if ((not defined($target)) or ($ra >= 24)) {
     my $err_title = "Could not parse coordinates";
     my $err_message = "Could not parse the coordinates RA = [$ra]" 
-	. " and/or Dec = [$dec].<br />  (Note: square brackets are not part"
+	. " and/or Dec = [$dec].<br />  Note: square brackets are not part"
 	. " of the input, but are used to show whether the coords "
-	. " have spaces or may be empty strings.";
+	. " have spaces or may be empty strings. <br />"
+	. "Also note that RA must be in <b>hours</b> (either decimal "
+	. "or sexagesimal), not degrees, and therefore must be < 24.";
     fatal_error($err_title, $err_message);
 }
 

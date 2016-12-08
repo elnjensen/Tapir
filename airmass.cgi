@@ -2,7 +2,7 @@
 
 # Web interface for calculating airmass vs. time for a given target. 
 
-# Copyright 2012 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -49,6 +49,7 @@ my ($observatory_string, $observatory_latitude, $observatory_longitude,
     $observatory_timezone, $days_to_print, $days_in_past, $minimum_elevation,
     $minimum_start_end_elevation, $minimum_depth, $minimum_priority,
     $use_utc, $invert, $invert_string, $no_invert_string,
+    $max_airmass, $min_plot_el,
     );
 
 
@@ -115,6 +116,17 @@ if ($invert) {
     $invert_string = "";
 }
 
+
+# Setting of maximum airmass to plot:
+if (defined $cookies{'max_airmass'}) {
+    $max_airmass = $cookies{'max_airmass'}->value;
+}
+if (not defined $max_airmass) {
+    $max_airmass = 2.4;
+}
+
+# Find elevation equivalent of the max airmass:
+$min_plot_el = sprintf("%0.1f", 90 - rad2deg(asec($max_airmass)));
 
 # If no cookie was set in one or more cases, then the above variables
 # have all been given sensible defaults by now, so some starting
@@ -520,6 +532,12 @@ Dec (J2000): <INPUT TYPE="text" name="dec">
     $invert_string /> White background (better for printing) <br /> 
 </p>
 
+
+<p>Maximum airmass to show in airmass plots: &nbsp;
+
+ <INPUT NAME="max_airmass" VALUE="$max_airmass" size="4" /> 
+<br /> (Current airmass value of $max_airmass is elevation of $min_plot_el degrees.)
+</p>
 
 <p>
 <INPUT TYPE="submit" VALUE="Submit">
