@@ -4,7 +4,7 @@
 # parameters come from finding_charts.cgi, and the finding chart is
 # created by calling the script get_finding_charts.pl.
 
-# Copyright 2012 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -123,9 +123,11 @@ if (not defined $target_name) {
 }
 
 # Reformat RA and Dec as needed; may have plus signs if passed via
-# URL; replace either plusses or spaces with colons:
+# URL; replace either plusses or spaces with colons, unless the plus
+# is at the start of the string:
 $ra  =~ s/[\s\+]+/:/g;
-$dec =~ s/[\s\+]+/:/g;
+$dec =~ s/[\s]+/:/g;
+$dec =~ s/(\d)[\+]+/$1:/g;
 
 # Create an Astro::Coords object with these coords, simply to check
 # and see if they are valid coordinates:
@@ -134,12 +136,14 @@ my $coords = new Astro::Coords( ra => $ra,
 				type => 'J2000',
 				);
 
-if (not defined($coords)) {
+if ((not defined($coords)) or ($ra >= 24)) {
     my $err_title = "Could not parse coordinates";
     my $err_message = "Could not parse the coordinates RA = [$ra]" 
-	. " and/or Dec = [$dec].<br />  (Note: square brackets are not part"
+	. " and/or Dec = [$dec].<br />  Note: square brackets are not part"
 	. " of the input, but are used to show whether the coords "
-	. " have spaces or may be empty strings.";
+	. " have spaces or may be empty strings. <br />"
+	. "Also note that RA must be in <b>hours</b> (either decimal "
+	. "or sexagesimal), not degrees, and therefore must be < 24.";
     fatal_error($err_title, $err_message);
 } else {
     ($ra, $dec) = $coords->radec();
