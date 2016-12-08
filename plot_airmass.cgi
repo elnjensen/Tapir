@@ -114,6 +114,9 @@ if ((not defined $max_airmass) or ($max_airmass eq "")) {
     $max_airmass = 2.4;
 }
 
+push @cookies, define_cookie('max_airmass', 
+			     $max_airmass);
+
 # Check to see if they set the parameter to plot right-hand labels:
 my $elevation_labels = $q->param("elevation_labels");
 if ((not defined $elevation_labels) or ($elevation_labels eq "")) {

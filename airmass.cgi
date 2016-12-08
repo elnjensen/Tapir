@@ -26,6 +26,7 @@
 
 use CGI;
 use CGI::Cookie;
+use Math::Trig; 
 
 use warnings;
 use strict;
@@ -126,7 +127,7 @@ if (not defined $max_airmass) {
 }
 
 # Find elevation equivalent of the max airmass:
-$min_plot_el = sprintf("%0.1f", 90 - rad2deg(asec($max_airmass)));
+$min_plot_el = sprintf("%0.1f", 90 - rad2deg(Math::Trig::asec($max_airmass)));
 
 # If no cookie was set in one or more cases, then the above variables
 # have all been given sensible defaults by now, so some starting
@@ -520,8 +521,10 @@ Target name:
 </p>
 
 <p>
-RA (J2000): <INPUT TYPE="text" name="ra"><br />
-Dec (J2000): <INPUT TYPE="text" name="dec">
+RA (J2000): <INPUT TYPE="text" name="ra"> (decimal or sexigesimal, but
+					   must be in <em>hours</em>,
+					   not degrees)<br />
+Dec (J2000): <INPUT TYPE="text" name="dec"> (decimal or sexigesimal degrees)
 </p>
 
 <p>
