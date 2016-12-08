@@ -4,7 +4,7 @@
 # target.  Input parameters are provided by airmass.cgi, which calls
 # this script. 
 
-# Copyright 2012 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -33,6 +33,7 @@ use SVG::TT::Graph::TimeSeries;
 use CGI;
 use CGI::Cookie;
 use LWP::Simple;
+use Math::Trig;
 
 use strict;
 use warnings;
@@ -107,6 +108,18 @@ if ((not defined $invert) or ($invert eq "")) {
     $invert = 0;
 }
 
+# Check to see if they set the parameter to change airmass scale:
+my $max_airmass = $q->param("max_airmass");
+if ((not defined $max_airmass) or ($max_airmass eq "")) {
+    $max_airmass = 2.4;
+}
+
+# Check to see if they set the parameter to plot right-hand labels:
+my $elevation_labels = $q->param("elevation_labels");
+if ((not defined $elevation_labels) or ($elevation_labels eq "")) {
+    $elevation_labels = 1;
+}
+
 push @cookies, define_cookie('invert', 
 			     $invert);
 
@@ -167,6 +180,9 @@ if (($ra eq '') and ($target_input ne '')) {
     # that string:
     if ($target_input =~ m%\A([A-Za-z0-9\-\+\.\s\*\[\]\(\)\/\'\"]+)\Z%) {
 	my $target_name = $1;
+	# Encode plusses in the name:
+	my $plus_code = '%2B';
+	$target_name =~ s/\+/$plus_code/g;
 	# Convert spaces in the name to plusses:
 	$target_name =~ s/ +/\+/g;
 	my $simbad_url = $vizier_mirror . "nph-sesame/" 
@@ -181,7 +197,9 @@ if (($ra eq '') and ($target_input ne '')) {
 	    my $err_message = "No RA given and could not parse/resolve"
 		. " name: $target_input \n"
 		. "<p> The output from Vizier was: "
-		. "<pre> $simbad_output </pre>" ;
+		. "<pre> $simbad_output </pre>" 
+		. "<p> The query URL was: "
+		. "<pre>$simbad_url</pre>";
 	    fatal_error($err_title, $err_message);
 	} else {
 	    $ra = $1;
@@ -291,7 +309,11 @@ my $end = $sunrise->clone->add(hours => 1, minutes => 30);
 $end->truncate(to=>'hour');
 # print "End is $end\n";
 
-my $start_date = $start->ymd();
+# Make a clone of the start date, which we'll switch to local time in
+# order to get the correct local date of sunset:
+my $start_date_local = $start->clone();
+$start_date_local->set_time_zone($timezone);
+my $start_date = $start_date_local->ymd();
 
 # For making the plot pretty, calculate the fraction of the way
 # through the time interval that sunset occurs:
@@ -346,11 +368,18 @@ if ($target_input ne '') {
     $title .= " for $target_input";
 }
 my $subtitle = "RA = $ra, Dec = $dec\; $observatory_name "
-    . "Lat, long = $observatory_longitude, $observatory_latitude";
+    . "Lat, long = $observatory_latitude, $observatory_longitude";
+
+my $date_label = "";
+if ($timezone !~ /UTC/) {
+    $date_label = "(local date at sunset)";
+}
+
+my $graph_width = 1000;
 
 my $graph = SVG::TT::Graph::TimeSeries->new({
     'height'              => 700,
-    'width'               => 1000,
+    'width'               => $graph_width,
     'stagger_x_labels'    => 0,
     'rotate_x_labels'     => 1,
     'show_data_points'    => 1,
@@ -359,13 +388,13 @@ my $graph = SVG::TT::Graph::TimeSeries->new({
     'x_label_format'      => '%H:%M',
     
     'area_fill'           => 0,
-    'min_scale_value'     => 2.4,
+    'min_scale_value'     => $max_airmass,
     'max_scale_value'     => 1,
     'scale_divisions'     => 0.2,
     'timescale_divisions' => '2 hours',
 
     'show_x_title'        => 1,
-    'x_title'             => "Time in zone $timezone on $start_date",
+    'x_title'             => "Time in zone $timezone on $start_date $date_label",
 
     'show_y_title'        => 1,
     'y_title'             => 'Airmass',
@@ -571,6 +600,49 @@ if ($invert) {
 		       class=${1}${2}_inverted/gx;
 }
 
+if ($elevation_labels) {
+    # Get all matches to the left-hand axis labels (generated
+    # automatically by SVG TT Graph) and use them to create corresponding
+    # right-hand labels that are in elevation units:
+    my @left_labels;
+    @left_labels = ( $svg =~ m%text x=\"[\d\.]+\" y=\"[\d\.]+\" class=\"yAxisLabels\">[\d\.]+<%g);
+
+    my $left_label;
+    my $right_label_string = '';
+
+    my $new_x = $graph_width - 2;
+
+    foreach $left_label (@left_labels) {
+	# Capture the coordinates with a regex:
+	$left_label =~ m%text x=\"([\d\.]+)\" y=\"([\d\.]+)\" class=\"yAxisLabels\">([\d\.]+)%;
+	my $xpos = $1;
+	my $ypos = $2;
+	my $airmass_val = $3;
+	# Get the elevation for that airmass:
+	my $elevation_val = 90 - rad2deg(asec($airmass_val));
+	my $elevation_print = sprintf("%d", $elevation_val);
+	my $right_label = "<text x=\"$new_x\" y=\"$ypos\"  " .
+	    "class=\"yAxisLabels\">$elevation_print</text>\n";
+	$right_label_string = $right_label_string . $right_label;
+    }
+
+    # Having constructed this list of right-hand labels, print them into
+    # the code at the end: 
+    $svg =~ s%(</svg>)%$right_label_string\n$1%;
+
+    # If we've done this, we need to make the view box for the SVG a
+    # little bigger so the right-hand labels don't get clipped:
+    my $new_width = $graph_width * 1.02;
+    $svg =~ s/viewBox=\"0 0 $graph_width (\d+)/viewBox=\"0 0 $new_width $1/;
+    my $graph_height = $1;
+    my $right_label_pos = $new_width * 0.99;
+    my $right_label_ypos = sprintf("%0.1f", $graph_height * 0.5);
+
+    # Add a right-hand y-axis label:
+    $svg =~ s%(</svg>)% <text x=\"$right_label_pos\" y=\"$right_label_ypos\"
+	transform=\"rotate\(90,$right_label_pos,$right_label_ypos\)\"
+	class=\"yAxisTitle\">Elevation (degrees)</text>\n$1%;
+}
 
 # Finally, print a header and print the SVG code:
 
