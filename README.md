@@ -1,4 +1,4 @@
-#Tapir: Observation planning software
+# Tapir: Observation planning software
 
 A longer description, and links to examples of the code in use
 (including interfaces for plotting transit visibility, making airmass
@@ -14,7 +14,7 @@ notably a few style sheets (.css files) and an HTML template file
 (.tmpl) that control the appearance of the output.  In addition, there
 is separate code that generates the airmass plots and finding charts. 
 
-##Prerequisites:
+## Prerequisites:
 
 All of the code is in Perl (except for a little bit of Javascript in
 the input form), and requires that the following Perl packages be
@@ -44,7 +44,7 @@ Perl distributions, the prerequisites should be handled
 automatically. 
 
 
-###Optional prerequisites:
+### Optional prerequisites:
 
 * `SVG::TT::Graph`:  Required for the code for making the airmass plots. 
 
@@ -82,7 +82,7 @@ If you run the code for creating finding charts, you'll need the tools
 path. 
 
 
-##Setup:
+## Setup:
 
 For the input form, there shouldn't be much setup needed - just put it
 in the same directory as the other files.  If you change the name of
@@ -152,7 +152,7 @@ There is an `HTML::Template` tutorial at
 http://www.perlmonks.org/?node_id=65642 .
 
 
-##Utility scripts and files included:
+## Utility scripts and files included:
 
 `get_finding_charts.pl`: this standalone script is used to produce the
 annotated finding charts linked from the output transit list.  It can
@@ -206,14 +206,14 @@ http://exoplanets.org/csv/exoplanets.csv
 `airmass.ico`: small icon file displayed with the airmass plots.
 
 
-##Copying: 
+## Copying: 
 
 This code is free software, and it is released under the terms of the
 GNU General Public License.  See the file COPYING.txt for more
 details. 
 
 
-##Acknowledgments:
+## Acknowledgments:
 
 Many thanks to the authors of various packages that made this work
 possible, especially Tim Jenness for Astro::Coords, Astro::Telescope,
@@ -224,7 +224,7 @@ Thanks to Jason Wright and his team for the exoplanets.org database,
 and to STScI for providing access to the Digitized Sky Survey. 
 
 
-##Feedback:
+## Feedback:
 
 If you use this code and find it useful, or if you have any bug fixes
 or suggestions for improvement, I'd appreciate it if you would let me
