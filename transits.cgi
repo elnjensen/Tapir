@@ -2,7 +2,7 @@
 
 # Web interface to provide a form for calculating transit visibility. 
 
-# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2015 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -46,15 +46,25 @@ my %cookies = CGI::Cookie->fetch;
 
 # For inclusion in the text, get the number of transiting planets by
 # just counting lines in our target file:
-my $target_file = 'transit_targets.txt';
+my $target_file = 'transit_targets.csv';
 my $n_planets = `wc -l $target_file`;
 # Get just the numeric part:
 $n_planets =~ s/^\s*(\d+) .*$/$1/;
+# Ignore the header line: 
+$n_planets -= 1;
+
+# Same for TESS file: 
+my $n_planets_tess = `wc -l toi_targets.csv`;
+$n_planets_tess =~ s/^\s*(\d+) .*$/$1/;
+$n_planets_tess -= 1;
+
 
 # Declare the settings variables that we'll use:
 my ($observatory_string, $observatory_latitude, $observatory_longitude,
     $observatory_timezone, $days_to_print, $days_in_past, $minimum_elevation,
-    $minimum_start_end_elevation, $minimum_depth, $minimum_priority,
+    $minimum_start_elevation, $minimum_end_elevation, 
+    $minimum_ha, $maximum_ha, $baseline_hrs,
+    $minimum_depth, $minimum_priority, $maximum_V_mag, $show_unc,
     $use_utc, $use_AND, $twilight, $max_airmass, $min_plot_el,
     );
 
@@ -100,11 +110,22 @@ if (not defined $use_utc) {
     $use_utc = 0;
 }
 
+if (defined $cookies{'Show_uncertainty'}) {
+    $show_unc = $cookies{'Show_uncertainty'}->value;
+}
+if (not defined $show_unc) {
+    $show_unc = 1;
+}
+
+my $unc_checked = $show_unc ? "checked" : "";    
 
 if (defined $cookies{'Use_AND'}) {
-    $use_AND = $cookies{'Use_AND'}->value;
-}
-if (not defined $use_AND) {
+    if ($cookies{'Use_AND'}->value eq 'and') {
+	$use_AND = 1; 
+    } else {
+	$use_AND = 0;
+    }
+} else {
     $use_AND = 0;
 }
 
@@ -126,15 +147,37 @@ if (defined $cookies{'minimum_elevation'}) {
     $minimum_elevation = $cookies{'minimum_elevation'}->value;
 }
 if (not defined $minimum_elevation) {
-    $minimum_elevation = 0;
+    $minimum_elevation = ' ';
 }
 
-if (defined $cookies{'minimum_start_end_elevation'}) {
-    $minimum_start_end_elevation 
-	= $cookies{'minimum_start_end_elevation'}->value;
+if (defined $cookies{'minimum_start_elevation'}) {
+    $minimum_start_elevation 
+	= $cookies{'minimum_start_elevation'}->value;
 }
-if (not defined $minimum_start_end_elevation) {
-    $minimum_start_end_elevation = 0;
+if (not defined $minimum_start_elevation) {
+    $minimum_start_elevation = ' ';
+}
+
+if (defined $cookies{'minimum_end_elevation'}) {
+    $minimum_end_elevation 
+	= $cookies{'minimum_end_elevation'}->value;
+}
+if (not defined $minimum_end_elevation) {
+    $minimum_end_elevation = ' ';
+}
+
+if (defined $cookies{'minimum_ha'}) {
+    $minimum_ha = $cookies{'minimum_ha'}->value;
+}
+if (not defined $minimum_ha) {
+    $minimum_ha = '';
+}
+
+if (defined $cookies{'maximum_ha'}) {
+    $maximum_ha = $cookies{'maximum_ha'}->value;
+}
+if (not defined $maximum_ha) {
+    $maximum_ha = '';
 }
 
 if (defined $cookies{'minimum_depth'}) {
@@ -144,11 +187,26 @@ if (not defined $minimum_depth) {
     $minimum_depth = 0;
 }
 
+
+if (defined $cookies{'baseline_hrs'}) {
+    $baseline_hrs = $cookies{'baseline_hrs'}->value;
+}
+if (not defined $baseline_hrs) {
+    $baseline_hrs = 1;
+}
+
 if (defined $cookies{'minimum_priority'}) {
     $minimum_priority = $cookies{'minimum_priority'}->value;
 }
 if (not defined $minimum_priority) {
     $minimum_priority = 0;
+}
+
+if (defined $cookies{'maximum_V_mag'}) {
+    $maximum_V_mag = $cookies{'maximum_V_mag'}->value;
+}
+if (not defined $maximum_V_mag) {
+    $maximum_V_mag = ''
 }
 
 # Setting of Sun elevation that defines night:
@@ -163,13 +221,13 @@ if (not defined $twilight) {
 if (defined $cookies{'max_airmass'}) {
     $max_airmass = $cookies{'max_airmass'}->value;
 }
-if (not defined $max_airmass) {
+# Make sure this has a sensible value: 
+if ((not defined $max_airmass) or ($max_airmass < 1)) {
     $max_airmass = 2.4;
 }
 
 # Find elevation equivalent of the max airmass:
 $min_plot_el = sprintf("%0.1f", 90 - rad2deg(asec($max_airmass)));
-
 
 # If no cookie was set in one or more cases, then the above variables
 # have all been given sensible defaults by now, so some starting
@@ -255,17 +313,20 @@ my $specified_index = $#obs_values - 1;
 
 my $q = CGI->new();
 
-print $q->header;
+#print $q->header;
+print $q->header(-type => 'text/html',
+		 -charset => 'utf-8');
 
 # Add some Javascript functions to the header; these will let 
 # us show/hide some elements on the fly, as needed; and they also pull
 # in source code for the date-picker widget.
 
+
 print << "END_1";
 
 <html>
 <head>
-  <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
+<meta content="text/html; charset=utf-8" http-equiv="content-type">
 
 <script type="text/javascript">
 
@@ -287,15 +348,11 @@ print << "END_1";
        }
    }
 
-   function toggle_visibility(id) {
-       var e = document.getElementById(id);
-       if(e.style.display == 'block') {
-	   e.style.display = 'none';
-	   document.getElementById('obs').options[0].selected = "selected";   
-       }
-       else {
-	   e.style.display = 'block';
-	   document.getElementById('obs').options[$specified_index].selected = "selected";   
+   function show_hide(optionValue,showValue,elementID) {
+       if(optionValue==showValue) {
+	   show(elementID);
+       } else {
+	   hide(elementID);
        }
    }
 
@@ -339,6 +396,25 @@ print << "END_1";
 	display:none;
 }
 
+label {
+    width: 45px;
+    display: block;
+    vertical-align: middle;
+    float:left;
+}
+
+.right {
+  width: 40px;
+  text-align: right;
+}
+
+input[type=submit] {
+  height:30px; 
+  width:80px;
+  border-radius: 6px; 
+  text-align: center;
+}
+
 </style>
 
 
@@ -369,21 +445,85 @@ print << "END_1";
 <body>
 <h2>Find Exoplanet Transits</h2>
 
-<p> 
-This form calculates which transits of the $n_planets known transiting
- exoplanets  are observable from a given location at a given time.
- Specify a time window, an observing location (either an observatory
- from the list or choose "Enter latitude/longitude" at the end of the
-					       list), and optionally
-    any filters (e.g. minimum transit depth or elevation).  The output
-    includes transit time and elevation, and links to further
-    information about each object, including finding charts and
-    airmass plots.
-</p>
+<p> This form calculates which transits of the $n_planets known
+ transiting exoplanets or $n_planets_tess TESS Objects of Interest
+ (TOIs) are observable from a given location at a given time.  Specify
+ a time window, an observing location (either an observatory from the
+ list or choose "Enter latitude/longitude" at the end of the list),
+ and optionally any filters (e.g. minimum transit depth or elevation).
+ The output includes transit time and elevation, and links to further
+ information about each object, including finding charts and airmass
+ plots.  (There are also stand-alone pages for generating <a
+ href="finding_charts.cgi">finding charts</a> and <a
+ href="airmass.cgi">airmass plots</a> for any target.)  </p>
 
 <FORM METHOD="GET" ACTION="print_transits.cgi"> 
 
+<h3>Target list:</h3>
+<div class="indent">
+<p>
+<INPUT TYPE="radio" NAME="single_object" VALUE="0" onclick="show_hide(this.value,'1','ephem_block')"
+Checked
+/> NASA Exoplanet Archive database ($n_planets planets; <a
+				    href="transit_targets.csv">CSV file</a>)  <br />
+<INPUT TYPE="radio" NAME="single_object" VALUE="2" onclick="show_hide(this.value,'1','ephem_block')"
+/> TESS Objects of Interest ($n_planets_tess TOIs; <a
+				    href="toi_targets.csv">CSV file</a>) <br/>
+<INPUT TYPE="radio" NAME="single_object" VALUE="1" onclick="show_hide(this.value,'1','ephem_block')"
+/> Single object
+    with given ephemeris (date and elevation filters below still
+    apply). <br />
+<div id="ephem_block" class="show_hide">
+<i>Note: to search for a specific known transiting exoplanet, don\'t use this.  Choose
+"NASA Exoplanet Archive database" above, then enter the target name below in the
+box labeled "Only show targets with names matching this string."  Use
+this only if you want to manually enter the ephemeris for some
+other target (or try an alternate ephemeris for a known target). </i>
+</p>
+
+<div id="ephemeris" style="margin-left:2cm;">
+<p>
+<table style="border-spacing:0; padding-left:10px" >
+
+<tr>
+<td> RA (J2000): &nbsp; </td> <td> <INPUT TYPE="text" size="15" name="ra"></td>
+</tr>
+<tr>
+<td>Dec (J2000): &nbsp;</td> <td> <INPUT TYPE="text" size="15" name="dec"></td>
+</tr>
+
+<tr>
+<td> JD (UTC) of mid-transit: &nbsp; </td>
+<td><input type="text" size="15"
+    name="epoch"  style="text-align:center" /></td>
+</tr>
+<tr>
+<td>Period (days): &nbsp;</td>
+<td><input type="text" size="15"
+    name="period"  style="text-align:center" /></td>
+</tr>
+<tr>
+<td>Transit duration (hours): &nbsp;</td>
+<td><input type="text" size="15"
+    name="duration"  style="text-align:center" /></td>
+</tr>
+
+<tr>
+<td>Target name (<i>optional, for labeling only</i>): &nbsp;</td>
+<td>
+<input type="text" size="15"
+    name="target"  style="text-align:center" />
+</td>
+</tr>
+
+</table>
+</div>
+</div>
+</div>
+
 END_1
+
+
 
 # Now print out the dropdown for observatories, selecting the one
 # specified by the cookie (if any):
@@ -391,10 +531,14 @@ END_1
 my $i = 0;  # Index to step through the list of values
 my $observatory;
 
-print $q->p("Choose an observatory, or manual latitude/longitude entry:");
+print $q->h3("Observatory:");
+print "<div class='indent'>\n";
+print $q->p("Choose an observatory, or choose \"manual coordinate
+entry\" at end of list:");
 print '<div class="p-style">';
 print "<SELECT id=\"obs\" name=\"observatory_string\"  ";
-print " onchange=\"show_lat_long(this.value)\">\n";
+#print " onchange=\"show_lat_long(this.value)\">\n";
+print " onchange=\"show_hide(this.value,'Specified_Lat_Long','lat_long')\">\n";
 
 foreach $observatory (@obs_labels) {
     $value = $obs_values[$i];
@@ -424,7 +568,7 @@ if ($observatory_string =~ /$manual_entry_value/) {
     $lat_long_class = "hidden";
 }
 
-print "</SELECT>\n\n";
+print "</SELECT></div>\n\n";
 
 # Set the correct checkbox to be checked on or off by default, based
 # on their past preferences from the cookie:
@@ -437,6 +581,17 @@ if ($use_utc) {
     $utc_on_string = "";
 }
 
+# Similarly for AND vs OR on elevation constraints:
+my ($AND_on_string, $AND_off_string);
+if ($use_AND) {
+    $AND_on_string = "Checked";
+    $AND_off_string = "";
+} else {
+    $AND_off_string = "Checked";
+    $AND_on_string = "";
+}
+
+
 print << "END_2";
 
 &nbsp; <INPUT TYPE="radio" NAME="use_utc" VALUE="1" $utc_on_string/> 
@@ -445,7 +600,7 @@ Use UTC &nbsp;/&nbsp;
 Use observatory\'s local time.
 </div>
 
-<DIV id="lat_long" class="$lat_long_class">
+<DIV id="lat_long" class="$lat_long_class" style="margin-left:2cm;">
 
 <!-- Add an extra message to the user if scripting is disabled and
     these boxes are not toggled on/off automatically by the drop-down
@@ -547,7 +702,10 @@ print << "END_3";
 
 </p>
 
-<p>
+<h3>Date window:</h3>
+<div class="indent">
+<p title="Entering 'today' searches 24 hours from current time; specifying a
+date starts search at local noon at observatory on that date.">
 Base date for transit list (mm-dd-yyyy or <i>'today'</i>): 
 <input type="text" value="today" size="10"
     id="start_date" name="start_date"  style="text-align:center" />
@@ -561,47 +719,159 @@ Base date for transit list (mm-dd-yyyy or <i>'today'</i>):
 
 <p>
 From that date, show transits for the next 
- <INPUT NAME="days_to_print" VALUE="$days_to_print" size="2"/> days.  
+ <INPUT NAME="days_to_print" VALUE="$days_to_print" size="4" autofocus /> days.  
+<br />
 (Also include transits from the previous 
- <INPUT NAME="days_in_past" VALUE="$days_in_past" size="2"/> days.) 
-<p /> 
+ <INPUT NAME="days_in_past" VALUE="$days_in_past" size="4"/> days.) 
+</p> 
+</div>
 
+<h3>Constraints:</h3>
+
+<h4> Elevation: </h4>
+<div class="indent">
 <p>
 Only show transits with an elevation (in degrees) of at least: 
 </p>
  
 <table style="border-spacing:0"><tr>
-<td> at ingress <i>or</i> egress:</td><td> <INPUT NAME="minimum_start_end_elevation" VALUE="$minimum_start_end_elevation"
-    size="2"/> </td><td rowspan=2 style="border-top:1px solid black; border-bottom:1px solid black">&nbsp;</td>
-    <td rowspan=2 style="border-left:1px solid black"> &nbsp; These elevation constraints are ANDed;
-    both must be met.<br>&nbsp; Unspecified
-    values default to 0.</td></tr>
-<tr><td> at mid-transit:</td><td> <INPUT NAME="minimum_elevation"
-    VALUE="$minimum_elevation" size="2"/> </td></tr>
+<td>at ingress:</td><td style="padding:2"> <INPUT NAME="minimum_start_elevation" VALUE="$minimum_start_elevation"
+    size="2"/> </td> <td rowspan=2 style="border-top:1px solid black; border-bottom:1px solid black">&nbsp;</td>
+    <td rowspan=2 style="border-left:1px solid black"> &nbsp; Combine
+    constraints with <INPUT TYPE="radio" NAME="and_vs_or" VALUE="and"
+ $AND_on_string
+/> AND <INPUT TYPE="radio" NAME="and_vs_or" VALUE="or" $AND_off_string
+    /> OR.</td></tr>
+<tr><td>at egress:</td><td style="padding:2"> <INPUT NAME="minimum_end_elevation"
+    VALUE="$minimum_end_elevation" size="2"/> </td></tr>
 </table>  
-<p></p>
+
+<p> Unspecified elevation constraints default to 0. Constraints are
+    evaluated <em>at night</em>, i.e. to be shown as observable an event has to meet
+    that elevation constraint during nighttime hours. </p>
+</div>
+
+<p>
+<INPUT TYPE="submit" VALUE="Submit">
+</p>
+
+<h4> Hour angle: </h4>
+<div class="indent">
+ <p> Only show transits with hour angle between <INPUT NAME="minimum_ha" VALUE="$minimum_ha" size="4"/> 
+and <INPUT NAME="maximum_ha" VALUE="$maximum_ha" size="4"/> hours.  Constraints are evaluated only at ingress and egress.  Unspecified HA constraints default to &plusmn;12 (i.e. no constraint). 
+</p>
+</div>
+
+
+<h4> Out-of-transit baseline: </h4>
+<div class="indent">
+ <p> Also calculate observability (elevation, daylight, etc.) at points <INPUT NAME="baseline_hrs" VALUE="$baseline_hrs" size="4"/> hours before ingress and/or after egress to show whether out-of-transit baseline can be observed. 
+</p>
+<p style="padding-left: 24px; text-indent: -24px;"> <input
+    type="checkbox" name="show_unc" value="1" $unc_checked> Extend baseline by ephemeris uncertainty. (If baseline above is zero, this option will display baseline of uncertainty only.) </p>
+</div>
+
+<h4> Space observing: </h4> 
+<div class="indent">
+<p style="padding-left: 24px; text-indent: -24px;"> <input type="checkbox" name="space" value="1"> Ignore all elevation, hour angle, and 
+    day/night constraints; show all transits.  Useful for space-based
+    observing (but can generate <em>lots</em> of output if no target
+    constraints specified). </p>
+</div>
+
+<h4> Depth: </h4> 
+<div class="indent">
+
 <p>
 Only show transits with a depth of at least <INPUT
-    NAME="minimum_depth" VALUE="$minimum_depth" size="1"/> millimag. </p>
+    NAME="minimum_depth" VALUE="$minimum_depth" size="3"/> millimag. 
+</p>
+
+</div>
+
+<h4> V magnitude: </h4> 
+<div class="indent">
+
+<p>
+Only show targets brighter than V = <INPUT
+    NAME="maximum_V_mag" VALUE="$maximum_V_mag" size="2"/>. 
+</p>
+
+</div>
+
+<h4> Name: </h4> 
+<div class="indent">
+
 <p>
 Only show targets with names matching this string: <INPUT
     NAME="target_string"  size="28"/>.<br />
 <i>(Not case sensitive; can be a Perl regular expression.)</i></p>
+</div>
 
 <p>
-Output format<br />
-<INPUT TYPE="radio" NAME="print_html" VALUE="1" Checked/> HTML table <br />
-<INPUT TYPE="radio" NAME="print_html" VALUE="0"/> CSV file
-for calendar import. (Save resulting output to a text file,
-then import into your observing calendar, e.g., <a
-href="http://www.google.com/support/calendar/bin/answer.py?hl=en&answer=37118">
-import into Google Calendar.)</a></p>
+<INPUT TYPE="submit" VALUE="Submit">
+</p>
+
+
 <p>
 Show the input ephemeris data used to generate the target list (useful
 for debugging if a particular target isn\'t showing up as you
 expect):<br />
 <INPUT TYPE="radio" NAME="show_ephemeris" VALUE="0" Checked/> No <br />
 <INPUT TYPE="radio" NAME="show_ephemeris" VALUE="1"/> Yes <br />
+</p>
+
+
+<h3>Output format and labeling:</h3>
+<p>
+Output results as: <br />
+<INPUT TYPE="radio" NAME="print_html" VALUE="1" Checked/> HTML table <br />
+<INPUT TYPE="radio" NAME="print_html" VALUE="2" /> CSV file for
+    parsing by script. <br />
+<INPUT TYPE="radio" NAME="print_html" VALUE="0"/> CSV file
+for calendar import. (Save resulting output to a text file,
+then import into your observing calendar, e.g., <a
+href="http://www.google.com/support/calendar/bin/answer.py?hl=en&answer=37118">
+import into Google Calendar.)</a></p>
+
+<p>Day/night definition: start night at Sun altitude of &nbsp;
+
+<select name="twilight">
+
+END_3
+
+# List the options for Sun altitude, and construct the drop down list,
+# marking the user's previously-selected value as the chosen one:
+my $sun_el;
+my @sun_els = (-1, -6, -12, -18);
+my @sun_titles = ("&nbsp;&nbsp;&minus;1 degrees (sunset)",
+		  "&nbsp;&nbsp;&minus;6 degrees (civil twilight)",
+		  "&minus;12 degrees (nautical twilight)",
+		  "&minus;18 degrees (astronomical twilight)"
+		  );                           
+
+$i = 0;  # Index to step through the list of values
+foreach $sun_el (@sun_els) {
+    print "   <OPTION value=\"$sun_el\" ";
+    if ($twilight eq $sun_el) {
+	# Matches the cookie - set this to be the selected option:
+	print " selected = \"selected\" ";
+    }
+    print " > $sun_titles[$i] </OPTION>\n";
+    $i++;
+}
+
+print << "END_4";
+
+</SELECT>
+
+    <br />
+The above choice determines both which events are displayed (since
+part of the transit must be at night), and which parts of an event are 
+<span style="color:MediumVioletRed">color-coded to indicate
+    daytime</span>. 
+</p>
+
 
 <p>Maximum airmass to show in airmass plots: &nbsp;
 
@@ -609,15 +879,16 @@ expect):<br />
 <br /> (Current airmass value of $max_airmass is elevation of $min_plot_el degrees.)
 </p>
 
-
 <p>
 <INPUT TYPE="submit" VALUE="Submit">
 </FORM></p>
+
 <p>
-<p>
-This page uses input ephemeris data from <a
-href="http://exoplanets.org/">exoplanets.org</a>, maintained by Jason
-Wright.</p>
+This page uses input ephemeris data from the <a
+href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet
+    Archive</a> and <a
+    href="https://exofop.ipac.caltech.edu/tess/">ExoFOP-TESS</a>.
+</p>
 
 <p>
 This page was created by <a
@@ -638,4 +909,4 @@ href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
 
 </html>
 
-END_3
+END_4
