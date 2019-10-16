@@ -4,7 +4,7 @@
 # target.  Input parameters are provided by airmass.cgi, which calls
 # this script. 
 
-# Copyright 2012-2018 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
