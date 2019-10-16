@@ -7,7 +7,7 @@
 # provided by transits.cgi, which calls this script. 
 
 
-# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -32,8 +32,11 @@
 use Astro::Coords;
 use Astro::Telescope;
 
+# Note - code at the end of this file adds a couple of new methods to
+# DateTime and DateTime::Duration that aren't in the core module. 
 use DateTime;
 use DateTime::Duration;
+
 use DateTime::Set;
 use DateTime::Format::Epoch::JD;
 
@@ -41,6 +44,10 @@ use HTML::Template::Expr;
 use CGI;
 use CGI::Cookie;
 use URI::Escape;
+use Switch;
+use Encode;
+use List::Util qw (min max); 
+use Text::CSV qw( csv );
 
 # These next settings are turned on to have the strictest possible
 # error checking and warnings, to help find obscure bugs.  If they are
@@ -55,16 +62,29 @@ use warnings;
 # webserver log file:
 use CGI::Carp qw(fatalsToBrowser);
 
+# Our target file is encoded as UTF-8, so make sure everything we
+# write to the browser is encoded in the same way: 
+binmode(STDOUT, ":utf8");
+
 
 ############# Variables for local configuration ##############
 
 # Put things here that are likely to need to be changed in order to
 # use this code for a different purpose:
 
+# Maximum number of events to output; set to avoid searches 
+# that would tie up server for a long time: 
+my $max_eclipses_to_print = 1000;
+
 # Template for the HTML output page:
 my $template_filename = 'target_table.tmpl';
+# A template for CSV output; this may supersede the above setting
+# based on user input below.
+my $csv_template_filename = 'csv_text.tmpl';
 # File containing target info; include path as needed.
-my $target_file = 'transit_targets.txt';
+# This is the default value, subject to change below based on other
+# flags. 
+my $target_file = 'transit_targets.csv'; 
 
 # Parameters for setting cookies stored in the user's
 # browser to remember input parameters:
@@ -88,8 +108,10 @@ my $script_contact_person = 'Eric Jensen, ejensen1@swarthmore.edu';
 
 
 # Switch to turn on some very rudimentary debugging output:
-my $debug = 0;
+my $debug = 1;
 
+# Very rudimentary timing of the script:
+my $script_start_time = time;
 
 # Define the CGI object that will both allow us to fetch the input
 # variables to the script and also to print the HTML output:
@@ -117,7 +139,8 @@ if ((not defined $observatory_string) or ($observatory_string eq "")) {
 }
 
 my ($observatory_latitude, $observatory_longitude,
-    $temporary_timezone, $observatory_timezone, $observatory_name); 
+    $temporary_timezone, $observatory_timezone, 
+    $observatory_name, $observatory_shortname); 
 
 # Check to see if the entered string contains the text that indicates
 # we should ignore it and use individual fields instead, or if we
@@ -125,13 +148,14 @@ my ($observatory_latitude, $observatory_longitude,
 
 if ($observatory_string !~ /$flag_for_manual_entry/) {
     ($observatory_latitude, $observatory_longitude,
-     $temporary_timezone, $observatory_name) 
+     $temporary_timezone, $observatory_name, $observatory_shortname) 
 	= split(/;/, $observatory_string);
 } else {
     $observatory_longitude = $q->param("observatory_longitude");
     $observatory_latitude = $q->param("observatory_latitude");
     $temporary_timezone = $q->param("timezone");
-    $observatory_name = "";
+    $observatory_name = "Other Site";
+    $observatory_shortname = "Other Site";
 }
 
 # The timezone string gets used in an 'eval' statement by
@@ -145,27 +169,25 @@ if ($temporary_timezone =~ m%^\s*([_/+\-0-9A-Za-z]+)$%) {
     die "Unrecognized timezone: [$temporary_timezone]\n";
 }
 
-# Check to see if they set the parameter to use UTC no matter what:
+# Check to see if they set the parameter to use UTC no matter what.
+# We keep $observatory_timezone set to the local timezone, but 
+# use this boolean to check what to use for output for main display. 
 my $use_utc = $q->param("use_utc");
-if ((not defined $use_utc) or ($use_utc eq "")) {
+if ((not defined $use_utc) or ($use_utc =~ /^\s*$/)) {
     $use_utc = 0;
-}
-
-if ($use_utc) {
-    $observatory_timezone = 'UTC';
 }
 
 # Desired time windows for data:
 
 # Start date:
 my $start_date_string = $q->param("start_date");
-if ((not defined $start_date_string) or ($start_date_string eq "")) {
+if ((not defined $start_date_string) or ($start_date_string =~ /^\s*$/)) {
     $start_date_string = 'today';
 }
 
 # Days in the future to print (including start date):
 my $days_to_print = $q->param("days_to_print");
-if ((not defined $days_to_print) or ($days_to_print eq "")) {
+if ((not defined $days_to_print) or ($days_to_print =~ /^\s*$/)) {
     $days_to_print = 1;
 }
 
@@ -174,22 +196,67 @@ my $days_in_past = $q->param("days_in_past");
 
 # If they didn't specify a backward-looking window, then only show
 # future eclipses:
-if ((not defined $days_in_past) or ($days_in_past eq "")) {
+if ((not defined $days_in_past) or ($days_in_past =~ /^\s*$/)) {
   $days_in_past = 0;
 }
 
-# Minimum mid-transit elevation to show; default to zero:
-my $minimum_elevation = $q->param("minimum_elevation");
-if ((not defined $minimum_elevation) or ($minimum_elevation eq "")) {
-  $minimum_elevation = 0;
+# Minimum start/end elevation to show; default to 0:
+my $minimum_start_elevation = $q->param("minimum_start_elevation");
+if ((not defined $minimum_start_elevation) 
+    or ($minimum_start_elevation =~ /^\s*$/)) {
+  $minimum_start_elevation = 0;
 }
 
-# Minimum start/end elevation to show; default to 0:
-my $minimum_start_end_elevation = $q->param("minimum_start_end_elevation");
-if ((not defined $minimum_start_end_elevation) 
-    or ($minimum_start_end_elevation eq "")) {
-  $minimum_start_end_elevation = 0;
+my $minimum_end_elevation = $q->param("minimum_end_elevation");
+if ((not defined $minimum_end_elevation) 
+    or ($minimum_end_elevation =~ /^\s*$/)) {
+  $minimum_end_elevation = 0;
 }
+
+# Min/max hour angle to show; default to +/- 12H:
+my $minimum_ha = $q->param("minimum_ha");
+if ((not defined $minimum_ha) 
+    or ($minimum_ha =~ /^\s*$/)) {
+  $minimum_ha = -12;
+}
+
+my $maximum_ha = $q->param("maximum_ha");
+if ((not defined $maximum_ha) 
+    or ($maximum_ha =~ /^\s*$/)) {
+  $maximum_ha = 12;
+}
+
+my $baseline_hrs = $q->param("baseline_hrs");
+if ((not defined $baseline_hrs) 
+    or ($baseline_hrs =~ /^\s*$/)) {
+  $baseline_hrs = 0;
+}
+
+my $show_unc = $q->param("show_unc");
+if ((not defined $show_unc) 
+    or ($show_unc =~ /^\s*$/)) {
+  $show_unc = 0;
+}
+
+
+# Fall back on 'or' behavior if there is it isn't defined,
+# or if there is anything other that "and" or "or" in that flag: 
+my $and_vs_or = $q->param("and_vs_or");
+if ((not defined $and_vs_or) 
+    or ($and_vs_or eq "") or ($and_vs_or !~ /^(and|or)$/)) {
+  $and_vs_or = "or";
+}
+
+
+# Special flag for observing from space; no elevation or day/night
+# constraints on transit visibility:
+my $observing_from_space = $q->param("space");
+if ((not defined $observing_from_space) 
+    or ($observing_from_space eq "")) {
+  $observing_from_space = 0;
+}
+
+
 
 # Minimum priority to show; default to zero:
 my $minimum_priority = $q->param("minimum_priority");
@@ -199,8 +266,20 @@ if ((not defined $minimum_priority) or ($minimum_priority eq "")) {
 
 # Minimum depth (in millimags) to show; default to zero:
 my $minimum_depth = $q->param("minimum_depth");
-if ((not defined $minimum_depth) or ($minimum_depth eq "")) {
+if ((not defined $minimum_depth) or ($minimum_depth =~ /^\s*$/)) {
   $minimum_depth = 0;
+}
+
+# Maximum (faintest) V mag to show:
+my $maximum_V_mag = $q->param("maximum_V_mag");
+if ((not defined $maximum_V_mag) or ($maximum_V_mag =~ /^\s*$/)) {
+  $maximum_V_mag = 30;
+}
+
+# Maximum airmass for airmass plots:
+my $max_airmass = $q->param("max_airmass");
+if ((not defined $max_airmass) or ($max_airmass =~ /^\s*$/)) {
+  $max_airmass = 2.4;
 }
 
 # Target name string to match (can be a regex):
@@ -212,8 +291,57 @@ if (not defined $target_string) {
     $target_string =~ s/^\s*(\S+)\s*$/$1/;
 }
 
+# Check to see if we are doing just a single object with manual
+# ephemeris entry.  If this is set to 1, it means that we 
+# will not read the target file, but will instead take the
+# entered ephemeris for a single object and just use that.
+my $single_object = $q->param("single_object");
+if ((not defined $single_object) or ($single_object eq "")) {
+    $single_object = 0;
+}
+
+
+# The 'single_object' flag is overloaded to possibly indicate
+# alternate target lists: 
+my $tess = 0;
+
+# Flag for doing TOIs instead of known planets: 
+if ($single_object == 2) {
+    $target_file = 'toi_targets.csv';
+#    $template_filename = 'target_table.tmpl';  # may change this
+    $tess = 1;
+}
+
+
+
 # Whether to show the ephemeris data:
 my $show_ephemeris = $q->param("show_ephemeris");
+
+# How to define twilight (given value is altitude of Sun at division
+# between day and night, e.g. -12 for nautical twilight).
+my $twilight = $q->param("twilight");
+if ((not defined $twilight) or ($twilight =~ /^\s*$/)) {
+  $twilight = -12;
+}
+
+# Set up the value in radians of this angle (which is what the
+# calculations actually require, as well as a label to use for the
+# output:
+my ($twilight_rad, $twilight_label);
+
+switch ($twilight) {
+    case -1   {$twilight_rad = Astro::Coords::SUN_RISE_SET;
+	       $twilight_label = "Sunrise/sunset"; }
+    case -6   {$twilight_rad = Astro::Coords::CIVIL_TWILIGHT;
+	       $twilight_label = "Civil twilight"; }
+    case -12  {$twilight_rad = Astro::Coords::NAUT_TWILIGHT;
+	       $twilight_label = "Nautical twilight"; }
+    case -18  {$twilight_rad = Astro::Coords::AST_TWILIGHT;
+	       $twilight_label = "Astronomical twilight"; }
+    # Default to nautical if any other value given:
+    else      {$twilight_rad = Astro::Coords::NAUT_TWILIGHT;
+	       $twilight_label = "Nautical twilight"; }
+}
 
 # Whether the output will be printed as an HTML table; if this
 # parameter is not set, then the output is printed in a
@@ -223,6 +351,11 @@ my $print_html =  $q->param("print_html");
 # If they don't pass the parameter at all, print HTML rather than CSV:
 if (not defined $print_html) {
     $print_html = 1;
+}
+
+if ($print_html == 2) {
+    # Signal for raw CSV output; change the template:
+    $template_filename = $csv_template_filename;
 }
 
 # As long as the user allows it, we set cookies for many of the input
@@ -242,6 +375,22 @@ my $observatory_cookie = CGI::Cookie->
 my $utc_cookie = CGI::Cookie->
     new(-name    =>  'Use_UTC',
 	-value   =>  "$use_utc",
+	-expires =>  $cookie_expires,
+	-domain  =>  $cookie_domain,
+	-path    =>  $cookie_path,
+	);
+
+my $unc_cookie = CGI::Cookie->
+    new(-name    =>  'Show_uncertainty',
+	-value   =>  "$show_unc",
+	-expires =>  $cookie_expires,
+	-domain  =>  $cookie_domain,
+	-path    =>  $cookie_path,
+	);
+
+my $and_cookie = CGI::Cookie->
+    new(-name    =>  'Use_AND',
+	-value   =>  "$and_vs_or",
 	-expires =>  $cookie_expires,
 	-domain  =>  $cookie_domain,
 	-path    =>  $cookie_path,
@@ -287,21 +436,47 @@ my $days_in_past_cookie = CGI::Cookie->
       -path    =>  $cookie_path,
      );
 
-my $minimum_elevation_cookie = CGI::Cookie->
-  new(-name  =>  'minimum_elevation',
-      -value   =>  "$minimum_elevation",
+my $minimum_start_elevation_cookie = CGI::Cookie->
+  new(-name => 'minimum_start_elevation',
+      -value   =>  "$minimum_start_elevation",
       -expires =>  $cookie_expires,
       -domain  =>  $cookie_domain,
       -path    =>  $cookie_path,
      );
 
-my $minimum_start_end_elevation_cookie = CGI::Cookie->
-  new(-name => 'minimum_start_end_elevation',
-      -value   =>  "$minimum_start_end_elevation",
+my $minimum_end_elevation_cookie = CGI::Cookie->
+  new(-name => 'minimum_end_elevation',
+      -value   =>  "$minimum_end_elevation",
       -expires =>  $cookie_expires,
       -domain  =>  $cookie_domain,
       -path    =>  $cookie_path,
      );
+
+my $minimum_ha_cookie = CGI::Cookie->
+  new(-name => 'minimum_ha',
+      -value   =>  "$minimum_ha",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+my $maximum_ha_cookie = CGI::Cookie->
+  new(-name => 'maximum_ha',
+      -value   =>  "$maximum_ha",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+
+my $baseline_hrs_cookie = CGI::Cookie->
+  new(-name => 'baseline_hrs',
+      -value   =>  "$baseline_hrs",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
 
 my $minimum_priority_cookie = CGI::Cookie->
   new(-name    =>  'minimum_priority',
@@ -319,10 +494,36 @@ my $minimum_depth_cookie = CGI::Cookie->
       -path    =>  $cookie_path,
      );
 
+my $twilight_cookie = CGI::Cookie->
+  new(-name    =>  'twilight',
+      -value   =>  "$twilight",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+my $max_airmass_cookie = CGI::Cookie->
+  new(-name    =>  'max_airmass',
+      -value   =>  "$max_airmass",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+# Only store the V mag value if it's constraining, otherwise blank:
+my $maximum_Vmag_cookie = CGI::Cookie->
+  new(-name    =>  'maximum_V_mag',
+      -value   =>  $maximum_V_mag < 30 ? "$maximum_V_mag" : "",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
 # Now set up objects that will let us calculate the times of sunrise
 # and sunset, necessary for determining observability.
 
 my $sun = new Astro::Coords(planet => "sun");
+my $moon = new Astro::Coords(planet => "moon");
 
 # Associate the observatory coordinates with this object by defining a
 # telescope object for our coordinates. The library requires latitude
@@ -339,6 +540,7 @@ my $telescope = new Astro::Telescope(Name => "MyObservatory",
 				  Alt => 0,
 				 );
 $sun->telescope($telescope);
+$moon->telescope($telescope);
 
 
 # Calculate the set of sunrise and sunset times that we will use later
@@ -348,6 +550,10 @@ $sun->telescope($telescope);
 
 # To do this, we need to find the date around which we are basing the
 # calculation.  
+
+# If they specify 'today', we just do 24 hours from the present time.
+# But if they pick another date, we want to do noon to noon *in the
+# timezone of the observatory in question*. 
 
 my $base_date;
 if ($start_date_string =~ /^\s*today\s*$/i) {
@@ -370,14 +576,15 @@ if ($start_date_string =~ /^\s*today\s*$/i) {
 	die "Could not parse date [$start_date_string]; " 
 	    . "must be 'today' or in MM-DD-YYYY format. $hint";
     }
-    # Start at noon UTC on requested day:
+    # Start at noon, local time, on requested day:
     $base_date = DateTime->new(
 			 year => $year,
 			 month => $month,
 			 day => $day,
 			 hour => '12',
-			 time_zone => 'UTC',
+			 time_zone => $observatory_timezone,
 			 );
+    $base_date->set_time_zone('UTC');
 }
 
 # Get new objects for the start and end by cloning and then adding the
@@ -418,10 +625,8 @@ while ($current_date <= $end_date) {
 
   # Find the next sunrise and sunset times, and put them into the
   # sets we are building up:
-  my $next_sunset = $sun->set_time(horizon => 
-				Astro::Coords::NAUT_TWILIGHT);
-  my $next_sunrise = $sun->rise_time(horizon => 
-				  Astro::Coords::NAUT_TWILIGHT);
+  my $next_sunset = $sun->set_time(horizon => $twilight_rad);
+  my $next_sunrise = $sun->rise_time(horizon => $twilight_rad);
   $sunsets = $sunsets->union( $next_sunset ); 
   $sunrises = $sunrises->union( $next_sunrise ); 
 
@@ -447,29 +652,45 @@ my $print_calendar;
 
 if (not $print_html) {
   $print_calendar = 1;
-  print $q->header("text/plain");
+  print $q->header(-type =>"text/plain",
+		   -charset => "UTF-8");
   my $header_text = "Subject,Start Date,Start Time,End Date," .
     "End Time,All Day Event,Description\n";
   print $header_text;
 } else {  # HTML output
   $print_calendar = 0;
-  # Print the HTML header, including the cookies.  This output is
-  # where the cookies actually are returned the user's browser and set.
-  print $q->header(-type => "text/html",
-		   -cookie => [$latitude_cookie, 
-			       $longitude_cookie, 
-			       $utc_cookie,
-			       $observatory_cookie,
-			       $minimum_elevation_cookie,
-			       $timezone_cookie, 
-			       $days_cookie,
-			       $minimum_start_end_elevation_cookie, 
-			       $days_in_past_cookie, 
-			       $minimum_priority_cookie, 
-			       $minimum_depth_cookie]
-		  );
-  print $q->start_html( -title => "Upcoming transits",
-			);
+  if ($print_html == 1) {
+      # Print the HTML header, including the cookies.  This output is
+      # where the cookies actually are returned the user's browser and set.
+      print $q->header(-type => "text/html",
+		       -charset => "UTF-8",
+		       -cookie => [$latitude_cookie, 
+				   $longitude_cookie, 
+				   $utc_cookie,
+				   $unc_cookie,
+				   $and_cookie,
+				   $observatory_cookie,
+				   $timezone_cookie, 
+				   $days_cookie,
+				   $minimum_start_elevation_cookie, 
+				   $minimum_end_elevation_cookie, 
+				   $minimum_ha_cookie,
+				   $maximum_ha_cookie,
+				   $baseline_hrs_cookie,
+				   $days_in_past_cookie, 
+				   $minimum_priority_cookie, 
+				   $maximum_Vmag_cookie, 
+				   $minimum_depth_cookie,
+				   $max_airmass_cookie,
+				   $twilight_cookie]
+		       );
+      print $q->start_html( -title => "Upcoming transits",
+			    );
+  } else {
+      # Print raw CSV (not for calendar):
+      print $q->header(-type =>"text/plain",
+		       -charset => "UTF-8");
+  }
 }  # End printing headers.
 
 
@@ -497,16 +718,20 @@ my %constraints = (
 		   observatory_latitude => $observatory_latitude,
 		   observatory_longitude => $observatory_longitude,
 		   observatory_timezone => $observatory_timezone,
-		   minimum_elevation => $minimum_elevation,
-		   minimum_start_end_elevation 
-		      => $minimum_start_end_elevation,
+		   observing_from_space => $observing_from_space,
+		   minimum_start_elevation 
+		      => $minimum_start_elevation,
+		   minimum_end_elevation 
+		      => $minimum_end_elevation,
 		   sunrises => $sunrises,
 		   sunsets => $sunsets,
 		   telescope => $telescope,
 		   debug => $debug,
 		   base_date => $base_date,
+                   twilight_rad => $twilight_rad,
+                   sun => $sun,
+                   moon => $moon,
 		   );
-
 
 
 # Initialize the arrays we'll use to sort the eclipse times and
@@ -519,55 +744,143 @@ my @non_eclipse_info = ();
 # Separate code fetches the target info, and then stores it in a text
 # file.  Here we read in the text file and parse it. 
 
-# Read the file. Could include a different path here; be sure this
-# is readable by whatever process runs the CGI script.
 
-# Try to open the file:
-my $status = open FILE, $target_file;
-# If we fail to open the file, then send a message to the browser and
-# quit.
-if ($status == 0) {
-  my $message = "Reading the target file $target_file generated "
-    . "an error:\n$!\n";
-  fatal_error($message);
+# Specify the record separator we will use to split up the line
+# into fields; This record separator (a comma followed by a
+# period) makes it straightforward to allow commas to be embedded
+# within fields themselves.  Spaces on either side of the field
+# separator are not significant, i.e. they are ignored.
+
+my $rec_separator = ',.';
+
+# If they have entered an ephemeris for a single object, we use
+# that to construct an equivalent target info line; otherwise we
+# read target lines from the specified target file:
+
+my @lines = ();
+if ($single_object==1) {
+    # They have checked the radio button that specifies manual
+    # entry of the ephemeris for a single object, so get the
+    # entered info:
+    my $single_object_name =  $q->param("target");
+    my $single_object_period =  $q->param("period");
+    my $single_object_epoch =  $q->param("epoch");
+    my $single_object_duration =  $q->param("duration");
+    my $single_object_ra =  $q->param("ra");
+    my $single_object_dec =  $q->param("dec");
+    my $target_line = $single_object_name . $rec_separator
+	. $single_object_ra . $rec_separator
+	. $single_object_dec . $rec_separator
+	. " " . $rec_separator
+	. $single_object_epoch . $rec_separator
+	. $single_object_period . $rec_separator
+	. $single_object_duration . $rec_separator
+	. "Manually-entered single object" . $rec_separator
+	. "-1" . $rec_separator
+	. "-1" . $rec_separator
+	. "1";
+    push @lines, $target_line;
+    # Effectively disable the filtering on transit depth and
+    # priority below by re-setting the threshhold values here.
+    # The target doesn't have this info, so we don't want it
+    # to get filtered out inadvertently.
+    $minimum_depth = -2;
+    $minimum_priority = -2;
+} else {
+    # Read the file. Could include a different path here; be sure this
+    # is readable by whatever process runs the CGI script.
+
+    # Try to open the file; we wrote it with UTF-8 encoding, so make 
+    # sure we read it back the same way: 
+
+    @lines = @{ Text::CSV::csv(in => $target_file, 
+			       encoding => "UTF8",
+			       headers => "auto",
+		    )};
 }
-
-# Read and close the file; array @lines has one line of the datafile
-# per array entry.
-my @lines = <FILE>;
-close FILE;
 
 # Initialize a few variables for keeping track of errors:
 my $error_line_count = 0;
 my @error_names_list = ();
 
 
-# Now, loop over the lines of the input, assuming one target per line:
+# Flag to indicate whether we exit the loop after hitting a limit on
+# how many events to print: 
+my $reached_max_eclipses = 0;
+# Eclipses found so far: 
+my $n_eclipses = 0;
 
-my $line;
+# Now, loop over the lines of the input, assuming one target per
+# line.  Lines read from CSV are hash references, with each hash keyed
+# by the header names in the file. 
+
+# Fields assumed to be present in the CSV (and thus in the hash keys)
+# are: 
+
+# name: target name
+# RA:  J2000 RA in h:m:s
+# Dec: J2000 Dec in d:m:s
+# vmag: V magnitude
+# epoch:  JD for central transit (i.e. zero point of the ephemeris)
+# epoch_uncertainty: in days; optional, but propagated if present. 
+# period: Period in days
+# period_uncertainty: in days; optional, but propagated if present.
+# duration: Transit duration, in hours
+# comments: Comments on the target; these are not used in the processing,
+#           but they are passed along to the output.
+# depth: Depth of the transit in ppt.  Not used in calculations but
+#        can be a filter for which events to display.
+
+# If different field names are used in the input file, name
+# reassignments can be given below (as with RA and Dec here).
 
 TARGET_LOOP:
-foreach $line (@lines) {
+foreach my $target_ref (@lines) {
+  
+  # We default to everything being assumed to be a periodic /
+  # eclipsing / transiting event for this code; non-period targets are
+  # an option in other code that's not used here.
 
-  # Skip lines that are commented out:
-  if ($line =~ /^ *#/) {
-    next TARGET_LOOP;
+  $target_ref->{phot_requested} = 1;
+
+  # Likewise we assign a placeholder priority: 
+  $target_ref->{priority} = 1;
+
+  # Just different names for these than are in input file: 
+  $target_ref->{ra_string} = $target_ref->{RA};
+  $target_ref->{dec_string} = $target_ref->{Dec};
+
+
+  # A few fields in the TOI file have different names.  The "delete"
+  # command here removes the original entry, but also returns the
+  # value it deleted, so this has the effect of just replacing that
+  # key-value pair with a different key name. 
+  if ($tess) {
+      $target_ref->{duration} = delete $target_ref->{"Duration (hours)"};
+      $target_ref->{period} = delete $target_ref->{"Period (days)"};
+      $target_ref->{comments} = delete $target_ref->{"Comments"};
+      $target_ref->{period_uncertainty} = delete $target_ref->{"Period (days) err"};
+      $target_ref->{name} = sprintf("TIC %s (TOI %s)",
+				    $target_ref->{"TIC ID"},
+				    $target_ref->{"TOI"}); 
+      $target_ref->{vmag} = delete $target_ref->{"TESS Mag"};
+      $target_ref->{epoch} = delete $target_ref->{"Epoch (BJD)"};
+      $target_ref->{epoch_uncertainty} = delete $target_ref->{"Epoch (BJD) uncertainty"};
+      $target_ref->{depth} = sprintf("%0.2f", $target_ref->{"Depth (ppm)"}/1000.);  # We want ppt
+      if ((not defined $target_ref->{period}) or 
+	  ($target_ref->{period} == 0) or 
+	  (not defined $target_ref->{epoch}) or 
+	  (not defined $target_ref->{duration}))
+      {
+	  next TARGET_LOOP;
+      }
   }
 
-  # Skip empty lines (only whitespace):
-  if ($line =~ /^\s*$/) {
-    next TARGET_LOOP;
-  }
-
-  # Pass the data line to a subroutine that parses it into separate
-  # fields, and returns a reference to a hash containing that
-  # information in named fields.  It also returns a cleaned-up version
-  # of the input line that looks nicer for display.
-
-  my ($target_ref, $cleaned_line) = parse_target_line($line);
+  # For printing input info if needed: 
+  my $cleaned_line = join(", ", map { "$target_ref->{$_}" } keys %$target_ref);
 
   # Combine the hash of target-specific info with the
-  # previously-created has of general observatory circumstances, to
+  # previously-created hash of general observatory circumstances, to
   # make a master hash that we will use to determine object
   # observability.  Note that combining two hashes in this way causes
   # problems if there are duplicate keys in the two hashes (the value
@@ -604,26 +917,11 @@ foreach $line (@lines) {
 
   # Make sure the necessary fields are there (check against empty
   # strings) and if not, increment error count and go to next field.
-  # The "None" used here is specific to the output generated from the
-  # Google spreadsheet Python feed that is used to create the input
-  # datafile; fields that are empty in the spreadsheet end up as
-  # "None" here instead.
 
   my $error = 0;  # Start by assuming no error;
 
   # Must have coords no matter what:
-  if ( ($target_info{ra_deg} eq "") or ($target_info{dec_deg} eq "") ) {
-      $error = 1;
-  }
-
-  # Only have to have ephemeris info if it's a periodic target, type 1
-  # or type 3. 
-  if ( ( ($target_info{phot_requested} == 1) or 
-	 ($target_info{phot_requested} == 3) )
-       and
-       ( ($target_info{epoch} =~ /None/) or ($target_info{period} =~ /None/)
-	 or ($target_info{eclipse_width} =~ /None/) or
-	 ($target_info{period} == 0) ) ) {
+  if ( ($target_info{ra_string} eq "") or ($target_info{dec_string} eq "") ) {
       $error = 1;
   }
 
@@ -643,6 +941,10 @@ foreach $line (@lines) {
       next TARGET_LOOP;
   }
 
+  # See if the target is too faint:
+  if ($target_info{vmag} > $maximum_V_mag) {
+      next TARGET_LOOP;
+  }
 
   # OK, the target has passed all of our input filters, so now we pass
   # it off to the subroutine that reads the ephemeris and finds all of
@@ -666,7 +968,7 @@ foreach $line (@lines) {
   # through parameters rather than relying on globals. 
 
   # As long as this is a periodic target (type 1 or 3), we pass it to
-  # subroutine that calculates eclipses:
+  # the subroutine that calculates eclipses:
   if ( ($target_info{phot_requested} == 1) or
        ($target_info{phot_requested} == 3) ) {
 
@@ -682,15 +984,20 @@ foreach $line (@lines) {
       # times, and add those arrays to our growing lists:
       push @eclipse_times, @$eclipse_time_ref;
       push @eclipse_info, @$eclipse_info_ref;
+
+      # Check to see if we have reached the limit of how many events
+      # to find; if so set a flag and stop searching: 
+      $n_eclipses = scalar @eclipse_times;
+      if ($n_eclipses > $max_eclipses_to_print) {
+	  $reached_max_eclipses = 1;
+	  last TARGET_LOOP;
+      }
   }
 
   # Now we also need to check for observability for "any time"
   # targets; here we don't check for specific eclipses, just for
   # whether the maximum altitude of the target during the night
-  # exceeds the threshold set by the user.  We use the
-  # $minimum_elevation parameter here to do double-duty for
-  # mid-transit elevation and for minimum elevation overall for the
-  # "any time" targets.
+  # exceeds a given threshold (currently set to 10 degrees).
 
   if ( ($target_info{phot_requested} == 2) or
        ($target_info{phot_requested} == 3) ) {
@@ -739,7 +1046,7 @@ if ($error_line_count > 0) {
 my @array_indices = (0..$#eclipse_times);
 
 # Now we will sort that array, but as the sorting criterion, we will
-# use the array values of the array @eclipse_times .  The syntax of
+# use the array values of the array @eclipse_times.  The syntax of
 # Perl's sort is:
 # @array_of_sorted_values = sort { sorting criterion } @array_to_sort;
 
@@ -771,11 +1078,31 @@ if ($print_html) {
   } else {
       $past_string = '';
   }
-  print $q->h2("Upcoming events for the next $days_to_print $day_word"
-	       . " $past_string from $start_date_string;"
-	       .  " start/end given in timezone "
-	       . "$observatory_timezone.");
 
+  if ($reached_max_eclipses) {
+      my $max_message = "Not all potential targets were searched. "
+          . "Output truncated by exceeding cap of "
+	  . " $max_eclipses_to_print events. "
+          . "To search all targets, set tighter constraints"
+          .  " or use a shorter time window.";
+      if ($print_html) {
+	  print $q->h2($max_message);
+      } else {
+	  print $max_message;
+      }
+  }
+
+
+  if ($print_html) {
+      my $timezone_to_display = $use_utc ? 'UTC' : $observatory_timezone;
+      print $q->h2("Upcoming events for the next $days_to_print $day_word"
+		   . " $past_string from $start_date_string;"
+		   .  " start/end given in timezone "
+		   . "$timezone_to_display.");
+      my $label_lowercase = $twilight_label;
+      $label_lowercase =~ tr/[A-Z]/[a-z]/;
+      print $q->h3("Night starts/ends at $label_lowercase.");
+  }
 
   # In order to let events on the same night have a leading column
   # that spans multiple rows (i.e. to just list that night's date
@@ -807,12 +1134,12 @@ if ($print_html) {
     $current_count = 1;
     # Save the date string we'll compare to in order to see if the
     # following events are on the same date:
-    $previous_string = $sorted_eclipse_info[$i]->{sunset_local_date};
+    $previous_string = $sorted_eclipse_info[$i]->{sunset_local_datetime};
     # Go to next element:
     $i++;
     # See if the following elements have the same date:
     while ( ($i <= $last_index) and 
-	    ($sorted_eclipse_info[$i]->{sunset_local_date} eq 
+	    ($sorted_eclipse_info[$i]->{sunset_local_datetime} eq 
 	     $previous_string) ) 
       {
 	# Found a similar value, so increment our count:
@@ -853,12 +1180,42 @@ if ($print_html) {
 		     observatory_latitude => $observatory_latitude,
 		     observatory_longitude => $observatory_longitude,
 		     observatory_name => $observatory_name,
-		     observatory_string => uri_escape($observatory_string),
+		     observatory_shortname => $observatory_shortname,
+		     observing_from_space => $observing_from_space,
+		     observatory_string =>
+		       uri_escape($observatory_string),
+		     minimum_start_elevation => 
+		       $minimum_start_elevation,
+		     minimum_end_elevation => 
+		       $minimum_end_elevation,
+		     minimum_ha => 
+		       $minimum_ha,
+		     maximum_ha => 
+		       $maximum_ha,
 		     timezone => $observatory_timezone,
+		     baseline_hrs => $baseline_hrs,
+		     show_unc => $show_unc,
+		     use_utc => $use_utc,
+		     and_vs_or => $and_vs_or,
+		     minimum_depth => $minimum_depth,
+		     minimum_priority => $minimum_priority,
+		     twilight => $twilight,
+		     twilight_label => $twilight_label,
 		     show_ephemeris => $show_ephemeris,
+		     max_airmass => $max_airmass,
+		     reached_max_eclipses => $reached_max_eclipses,
+		     tess => $tess,
 		    );
   print $template->output();
-  print $q->end_html;
+
+  if ($print_html == 1) {
+      if ($debug) {
+	  my $execution_time = sprintf("Script took %d seconds for %d events.", 
+				       time - $script_start_time, $n_eclipses);
+	  print $q->p($execution_time);
+      }
+      print $q->end_html;
+  }
 
 } else {  # Matches "if $print_html" - if not, it's CSV output.
   my $eclipse_entry;
@@ -895,39 +1252,58 @@ sub get_eclipses {
   # pass them in in any particular order.
 
   my ($param_ref) = @_;
-  my $ra_deg = $param_ref->{ra_deg};
-  my $dec_deg = $param_ref->{dec_deg};
   my $ra_string = $param_ref->{ra_string};
   my $dec_string = $param_ref->{dec_string};
   my $name = $param_ref->{name};
   my $vmag = $param_ref->{vmag};
   my $epoch = $param_ref->{epoch};
+  my $epoch_uncertainty = $param_ref->{epoch_uncertainty};
   my $period = $param_ref->{period};
-  my $eclipse_width = $param_ref->{eclipse_width};
+  my $period_uncertainty = $param_ref->{period_uncertainty};
+  my $eclipse_width = $param_ref->{duration};
   my $days_to_print = $param_ref->{days_to_print};
   my $days_in_past = $param_ref->{days_in_past};
   my $do_secondary_eclipses = $param_ref->{do_secondary_eclipses};
   my $observatory_timezone = $param_ref->{observatory_timezone};
+  my $observing_from_space = $param_ref->{observing_from_space};
   my $comments = $param_ref->{comments};
   my $priority = $param_ref->{priority};
   my $depth = $param_ref->{depth};
   my $sunsets = $param_ref->{sunsets};
   my $sunrises = $param_ref->{sunrises};
   my $telescope = $param_ref->{telescope};
-  my $minimum_elevation = $param_ref->{minimum_elevation};
-  my $minimum_start_end_elevation 
-    = $param_ref->{minimum_start_end_elevation};
+  my $minimum_start_elevation 
+    = $param_ref->{minimum_start_elevation};
+  my $minimum_end_elevation 
+    = $param_ref->{minimum_end_elevation};
   my $debug = $param_ref->{debug};
   my $base_date = $param_ref->{base_date};
+  my $sun = $param_ref->{sun};
+  my $moon = $param_ref->{moon};
+  my $twilight_rad = $param_ref->{twilight_rad};
+
+  my $tess = (defined $param_ref->{'TESS Disposition'}) ? 1 : 0;
 
   # Before we can calculate eclipse visibility, we need to set up
   # some basics, like the current date and time.
 
   my $thisjd = DateTime::Format::Epoch::JD->format_datetime($base_date); 
 
-  if ($debug) {
-    carp "Base date is JD $thisjd\n";
-  }
+  # Set up a coordinate object that will allow us
+  # to calculate the elevation of the target at different
+  # times: 
+
+  my $target = new Astro::Coords( ra => $ra_string,
+				  dec => $dec_string,
+				  type => 'J2000',
+				  units => 'sexagesimal',
+      );
+  $target->telescope($telescope);
+
+  my $ra_deg = $target->ra( format => 'deg' );
+  my $dec_deg = $target->dec( format => 'deg' );
+
+
 
   # Now the next bit of code takes the 'epoch' field of the transit
   # ephemeris, which gives the JD of one particular transit (typically
@@ -982,14 +1358,11 @@ sub get_eclipses {
   # useful to have this expressed as a DateTime::Duration object as
   # well, for easier time arithmetic.
 
-  my $eclipse_half_width_hours = int($eclipse_width/2.);
-  my $eclipse_half_width_minutes = int(60.* (($eclipse_width/2.) - 
-					    $eclipse_half_width_hours));
-  my $eclipse_half_duration = DateTime::Duration->
-    new(
-	hours => $eclipse_half_width_hours,
-	minutes => $eclipse_half_width_minutes,
-       );
+  my $eclipse_half_duration =  hours_to_duration($eclipse_width/2.);
+
+  # Likewise for the out-of-transit baseline requested: 
+
+  my $baseline_duration = hours_to_duration($baseline_hrs);
 
   # Now we've laid all the groundwork, so we can start into the main
   # loop of this subroutine.  We start at the eclipse event whose
@@ -1013,6 +1386,7 @@ sub get_eclipses {
   my $eclipse_iteration = 0;
   my $max_eclipses_to_try = 2000;
 
+
  ECLIPSE_LOOP:
   while ($eclipse_iteration < $max_eclipses_to_try) {
     # Calculate JD of next eclipse:
@@ -1032,9 +1406,18 @@ sub get_eclipses {
       next ECLIPSE_LOOP;
     }
 
-    # Convert the eclipse midpoint from JD to a DateTime object: 
+    # Convert the eclipse midpoint from JD to a DateTime object.
+    # There's a slight computational cost to doing this conversion
+    # every time through the loop, rather than having one DateTime
+    # object and incrementing it; but the disadvantage of the latter
+    # is that we'd have to jump through hoops to create a Duration
+    # object of sufficient precision.  This is just simpler. 
+
     my $dt = DateTime::Format::Epoch::JD->parse_datetime($eclipse_jd);
     $dt->set_time_zone('UTC');
+    # Get the UT date of mid-transit:
+    my $mid_date_utc = $dt->ymd();
+
 
     # Now that we have the time object, we can ask the key
     # question: is this eclipse at night, or during the day? We
@@ -1044,107 +1427,382 @@ sub get_eclipses {
     # Get DateTime objects for start and end of eclipse:
     my $dt_start = $dt->clone->subtract_duration($eclipse_half_duration);
     my $dt_end = $dt->clone->add_duration($eclipse_half_duration);
+    my $start_date_utc = $dt_start->ymd();
+    my $end_date_utc = $dt_end->ymd();
 
-    # To test for daytime for a given event, we calculate the
-    # following sunset and the following sunrise.  If the next
-    # sunset comes before the next sunrise, then it's daytime. 
 
-    my $next_sunset = $sunsets->next($dt_start);
-    my $next_sunrise = $sunrises->next($dt_start);
-    my ($is_daytime_start, $is_daytime_mid, $is_daytime_end);
 
-    # The previous calls to "next" will return a defined value as
-    # long as the DateTime we're using is within the set.  This
-    # should always be true, but to be on the safe side, check for
-    # undefined values and throw an error if they occur:
-    if ( not (defined($next_sunset) and defined($next_sunrise)) ) { 
-      fatal_error("At date $dt_start, "
-		  . "next sunset or sunrise was undefined." );
-    }
-    $is_daytime_start = ($next_sunset < $next_sunrise);
+    # Then use this to get elevations at the relevant times: 
+    $target->datetime($dt_start);
+    my $el_start_deg = $target->el(format=>'deg');
 
-    # Now we do the same thing for the middle and end of the
-    # event, though we add a couple of checks to avoid more sunset
-    # calculations than we need, since they are the most
-    # time-consuming part of the code.
-
-    # If we know the start is in the daytime, AND if the middle is
-    # before the sunset we just calculated, then we can figure out
-    # that the middle is in daytime, too, without calculating
-    # another pair of rise/set times.  But if not, we just go
-    # ahead and calculate it as above.
-
-    if ( $is_daytime_start and ($dt < $next_sunset) ) {
-      $is_daytime_mid = 1;
-    } else {
-      $next_sunset = $sunsets->next($dt);
-      $next_sunrise = $sunrises->next($dt);
-      if ( not (defined($next_sunset) and defined($next_sunrise)) ) { 
-	fatal_error("At date $dt, "
-		    . "next sunset or sunrise was undefined." );
-      }
-      $is_daytime_mid = ($next_sunset < $next_sunrise);
+    # Short-circuit our loop if this doesn't pass the cut: 
+    if ( ($el_start_deg < $minimum_start_elevation) 
+	 and ($and_vs_or eq 'and') and (not $observing_from_space)) {
+	$eclipse_iteration++;
+	next ECLIPSE_LOOP;
     }
 
-    # Similarly, if it's nighttime for the mid-eclipse AND the end
-    # of the eclipse comes before the previously-calculated next
-    # sunrise, then we know it's nighttime at the end of the
-    # eclipse, too, without doing the calculation.  
 
-    if ( (not $is_daytime_mid) and ($dt_end < $next_sunrise) ) {
-      $is_daytime_end = 0;
-    } else {
-      $next_sunset = $sunsets->next($dt_end);
-      $next_sunrise = $sunrises->next($dt_end);
-      if ( not (defined($next_sunset) and defined($next_sunrise)) ) { 
-	fatal_error("At date $dt_end, " 
-		    . "next sunset or sunrise was undefined." );
-      }
-      $is_daytime_end = ($next_sunset < $next_sunrise);
+    $target->datetime($dt_end);
+    my $el_end_deg = $target->el(format=>'deg');
+
+    if (      ($el_end_deg < $minimum_end_elevation) 
+	 and  ($el_start_deg < $minimum_start_elevation) 
+	 and (not $observing_from_space)) {
+	$eclipse_iteration++;
+	next ECLIPSE_LOOP;
+    } elsif (( ($el_end_deg < $minimum_end_elevation) 
+	 or    ($el_start_deg < $minimum_start_elevation) )
+	and ($and_vs_or eq 'and')
+        and (not $observing_from_space)) {
+	$eclipse_iteration++;
+	next ECLIPSE_LOOP;
     }
 
-    if (not ($is_daytime_mid 
-	     and $is_daytime_start 
-	     and $is_daytime_end)) {   
+    # If this event passes further cuts below, eventually we will want
+    # to know the mid-event elevation as well, but we defer
+    # calculating it, as well as hour angles and azimuths, until we're sure we need them. 
+
+
+    # Now we can check whether either the ingress or egress occurs at
+    # night; to do this, we just find the elevation of the sun at
+    # those times, and compare them to the threshold set by the user
+    # for determining sunset: 
+
+
+    $sun->datetime($dt_start); 
+    my $is_daytime_start = ( $sun->el(format=>'rad') > $twilight_rad );
+    $sun->datetime($dt_end); 
+    my $is_daytime_end   = ( $sun->el(format=>'rad') > $twilight_rad );
+
+    # Again, eventually we may want to know whether the middle is in
+    # daytime, but we'll defer that until we determine whether or not
+    # we really need it. 
+
+
+    if ( ($observing_from_space) or 
+	 (not ($is_daytime_start and $is_daytime_end))) {   
 
       # Part of eclipse is at night - go ahead!
 
-      # Above we have tested whether or not the eclipse falls
-      # within our time window, and then whether or not part of
-      # it falls at night.  The final test to select observable
-      # events is to determine whether the elevation is high
-      # enough. 
-
-      # First, we set up a coordinate object that will allow us
-      # to calculate the elevation of the target at different
-      # times: 
-
-      my $target = new Astro::Coords( ra => $ra_deg,
-				      dec => $dec_deg,
-				      type => 'J2000',
-				      units => 'degrees',
-				    );
-      $target->telescope($telescope);
-
-      # Then use this to get elevations at the relevant times: 
-      $target->datetime($dt_start);
-      my $el_start_deg = $target->el(format=>'deg');
-      $target->datetime($dt);
-      my $el_mid_deg = $target->el(format=>'deg');
-      $target->datetime($dt_end);
-      my $el_end_deg = $target->el(format=>'deg');
+      # To be shown as an observable eclipse, we check both the start
+      # and the end elevation, and also see whether the start and end
+      # are at night.  Whether the start and end constraints are ANDed
+      # or ORed depends on user input, so do and if-then for
+      # calculating the condtion.  We do require that these
+      # constraints be met *at night*.   To get around this, a user
+      # can specify the "space" observatory option, which shows all
+      # eclipses for a given target. 
 
 
-      # To be shown as an observable eclipse, either the start
-      # OR the end has to be above a minimum elevation (defaults
-      # to zero) AND the middle has to be above a (possibly
-      # different) minimum elevation:
+      my $start_is_observable = (($el_start_deg >= $minimum_start_elevation) 
+      	  and not $is_daytime_start);
+      my $end_is_observable = (($el_end_deg >= $minimum_end_elevation)
+      	  and not $is_daytime_end);
+      my $is_observable = eval("\$start_is_observable $and_vs_or \$end_is_observable");
 
-      if ((($el_start_deg >= $minimum_start_end_elevation) or
-	   ($el_end_deg >= $minimum_start_end_elevation)) and
-	  ($el_mid_deg >= $minimum_elevation)) {
 
-	# Then the eclipse should be visible!
+      if (($is_observable) or ($observing_from_space)) {
+	  
+	# Then the eclipse should be visible! ... but one more check: 
+
+	# Calculate the hour angles and aziumths at start; these are
+	# relatively expensive to calculate, so we defer them to here: 
+	$target->datetime($dt_start);
+	my $az_start_deg = $target->az(format=>'deg');
+	my $ha_start = $target->ha(format=>'hour');
+	$target->datetime($dt_end);
+	my $az_end_deg = $target->az(format=>'deg');
+	my $ha_end = $target->ha(format=>'hour');
+
+	# Now re-evaluate observability: 
+	$start_is_observable = ($start_is_observable and 
+	    ($ha_start >= $minimum_ha) and 
+	    ($ha_start <= $maximum_ha)); 
+
+	$end_is_observable = ($end_is_observable and 
+	    ($ha_end >= $minimum_ha) and 
+	    ($ha_end <= $maximum_ha)); 
+
+	$is_observable = eval("\$start_is_observable $and_vs_or \$end_is_observable");
+
+
+	unless (($is_observable) or ($observing_from_space)) {
+	     $eclipse_iteration++;
+	     next ECLIPSE_LOOP;
+	}
+
+
+	# Passed other tests, now go ahead and get the mid-event
+	# elevation and daytime status: 
+
+	$target->datetime($dt);
+	my $az_mid_deg = $target->az(format=>'deg');
+	my $el_mid_deg = $target->el(format=>'deg');
+	my $ha_mid = $target->ha(format=>'hour');
+
+	$sun->datetime($dt); 
+	my $is_daytime_mid   = ( $sun->el(format=>'rad') > $twilight_rad );
+
+	my $mid_is_observable = ((not $is_daytime_mid) and 
+				   ($el_mid_deg >= $minimum_end_elevation) and 
+				   ($el_mid_deg >= $minimum_start_elevation) and 
+				   ($ha_mid >= $minimum_ha) and 
+				   ($ha_mid <= $maximum_ha));
+
+        # Determine the uncertainty on the transit time by propagating
+        # the period and epoch uncertainties.  These may be undefined
+        # for particular targets.  If both are undefined, leave this
+        # uncertainty field as undefined.  If only one is undefined,
+        # it won't hurt the calculation since it will evaluate to zero
+        # when used as a scalar, so it won't contribute to the
+        # uncertainty calculation: 
+        my ($midtime_uncertainty_string, 
+	    $midtime_uncertainty_hours,
+	    $midtime_uncertainty_duration); 
+        if ( ( defined $period_uncertainty ) or 
+             ( defined $epoch_uncertainty ) ) {
+           # Input uncertainties are in days; add in quadrature and
+	   # convert to hours: 
+           $midtime_uncertainty_hours = 24. * sqrt($epoch_uncertainty**2 +
+               (($n_period_int + $eclipse_iteration)*$period_uncertainty)**2); 
+           # There are some cases where we have very stale
+	   # ephemerides, so the numbers from the above calculation
+	   # can get quite big.  But it's not meaningful for the
+	   # uncertainty to be bigger than half the period (since then
+	   # it covers the next event), so limit it here:
+           if ($midtime_uncertainty_hours > ($period * 0.5 * 24)) {
+               $midtime_uncertainty_hours =  $period * 0.5 * 24;
+           }
+
+	   $midtime_uncertainty_duration = hours_to_duration($midtime_uncertainty_hours); 
+
+           # And get a string to print out, HH:MM: 
+           $midtime_uncertainty_string = sprintf("%d:%02.0f",
+                                                  int($midtime_uncertainty_hours), 
+              60 * ($midtime_uncertainty_hours - int($midtime_uncertainty_hours))); 
+        } else {
+	   $midtime_uncertainty_duration = hours_to_duration(0); 
+	}
+
+	# If a non-zero baseline is requested, also calculate relevant quantities 
+	# at those points.  Initialize all first: 
+	my ($az_pre, $az_post, $el_pre, $el_post, 
+	    $ha_pre, $ha_post, $pre_time, $post_time,
+	    $pre_time_UTC, $post_time_UTC,
+	    $pre_date_UTC, $post_date_UTC,
+	    $is_daytime_pre, $is_daytime_post,
+	    $is_observable_pre, $is_observable_post,
+	    $is_observable_baseline) = (0) x 17;  
+
+	my $dt_pre = $dt_start - $baseline_duration;
+	my $dt_post = $dt_end + $baseline_duration;
+	if ($show_unc) {
+	    $dt_pre = $dt_pre - $midtime_uncertainty_duration;
+	    $dt_post = $dt_post + $midtime_uncertainty_duration;
+	}
+	    
+	if (($baseline_hrs > 0) or $show_unc) {
+	    $target->datetime($dt_pre);
+	    $az_pre = $target->az(format=>'deg');
+	    $el_pre = $target->el(format=>'deg');
+	    $ha_pre = $target->ha(format=>'hour');
+	    $target->datetime($dt_post);
+	    $az_post = $target->az(format=>'deg');
+	    $el_post = $target->el(format=>'deg');
+	    $ha_post = $target->ha(format=>'hour');
+	    $sun->datetime($dt_pre);
+	    $is_daytime_pre   = ( $sun->el(format=>'rad') > $twilight_rad );
+	    $sun->datetime($dt_post);
+	    $is_daytime_post   = ( $sun->el(format=>'rad') > $twilight_rad );
+	    $pre_time_UTC = $dt_pre->hm;
+	    $pre_date_UTC = $dt_pre->ymd;
+	    $post_time_UTC = $dt_post->hm;
+	    $post_date_UTC = $dt_post->ymd;
+	    $dt_pre->set_time_zone($observatory_timezone);
+	    $dt_post->set_time_zone($observatory_timezone);
+	    $pre_time = $dt_pre->hm;
+	    $post_time = $dt_post->hm;
+
+	    # Find observability, including baseline constraints: 
+	    $is_observable_pre = ((not $is_daytime_pre) and 
+				  ($el_pre >= $minimum_start_elevation) and 
+				  ($ha_pre >= $minimum_ha) and 
+				  ($ha_pre <= $maximum_ha));
+
+	    $is_observable_post = ((not $is_daytime_post) and 
+				   ($el_post >= $minimum_end_elevation) and 
+				   ($ha_post >= $minimum_ha) and 
+				   ($ha_post <= $maximum_ha));
+
+	    $is_observable_baseline = eval("\$is_observable_pre $and_vs_or \$is_observable_post");
+	}
+
+
+        # Find the times when we can actually start or end observing, 
+        # given the constraints.
+
+	# If ingress is observable, we'll tack on some previous
+        # baseline to see how much more we can observe.  If not, we
+        # just search forward from ingress.
+	# Right now hard-coding the min desired baseline as 1 hour: 
+	my $desired_baseline = max ($baseline_hrs + $midtime_uncertainty_hours, 1);
+
+	my $max_baseline = $start_is_observable ? $desired_baseline : 0;
+
+	# Find the earliest observable time, given desired baseline:
+	my $obs_start_time;
+	if ($observing_from_space) {
+	    $obs_start_time = $dt_start -
+		hours_to_duration($desired_baseline);
+	} else {
+	    $obs_start_time = 
+		observable_time({
+		    target => $target, 
+		    name => $name,
+		    start_time => $dt_start, 
+		    max_baseline => $max_baseline,
+		    minimum_elevation =>  $minimum_start_elevation,
+		    minimum_ha => $minimum_ha,
+		    maximum_ha => $maximum_ha,
+		    sun => $sun,
+		    twilight_rad => $twilight_rad,
+		    backward => 0,
+		    time_step_minutes => 1,
+				}
+		);
+	}
+
+	# Same logic for egress: 
+	$max_baseline = $end_is_observable ? $desired_baseline : 0;
+
+	my $obs_end_time;
+	if ($observing_from_space) {
+	    $obs_end_time = $dt_end +
+		hours_to_duration($desired_baseline);
+	    $start_is_observable = 1;
+	    $end_is_observable = 1;
+	    $mid_is_observable = 1;
+	    $is_observable_pre = 1;
+	    $is_observable_post = 1;
+	    $is_observable_baseline = 1;
+	} else {
+	    $obs_end_time = 
+		observable_time({
+		    target => $target, 
+		    name => $name,
+		    start_time => $dt_end, 
+		    max_baseline => $max_baseline,
+		    minimum_elevation =>  $minimum_end_elevation,
+		    minimum_ha => $minimum_ha,
+		    maximum_ha => $maximum_ha,
+		    sun => $sun,
+		    twilight_rad => $twilight_rad,
+		    backward => 1,
+				}
+		);
+	}
+
+	# Save this as JD for passing to ACP script:
+	my $obs_end_jd = DateTime::Format::Epoch::JD->
+	    format_datetime($obs_end_time);
+
+
+	# Get the fraction of the transit that is observable with the
+	# given constraints: 
+	my $transit_fraction;
+
+	if ($start_is_observable and $end_is_observable) {
+	    $transit_fraction = 100;
+	} elsif ($start_is_observable) {
+	    $transit_fraction = 100*($obs_end_time->
+				     subtract_datetime_absolute($dt_start)->seconds())/
+				     ($eclipse_width*3600);
+	} else {
+	    $transit_fraction = 100*($dt_end->
+				     subtract_datetime_absolute($obs_start_time)->seconds())/
+				     ($eclipse_width*3600);
+	}
+
+	if (not $use_utc) {
+	    $obs_start_time->set_time_zone($observatory_timezone);
+	    $obs_end_time->set_time_zone($observatory_timezone);
+	}
+
+	# Also find the fraction of desired OOT baseline that is
+	# observable.  We allocate 50% each to pre-ingress and
+	# post-egress baseline: 
+	my $baseline_fraction = 0;
+	if ($obs_start_time <= $dt_start) {
+	    $baseline_fraction += 50*($dt_start->
+				     subtract_datetime_absolute($obs_start_time)->seconds())/
+				     ($desired_baseline*3600);
+	}	    
+
+	if ($obs_end_time >= $dt_end) {
+	    $baseline_fraction += 50*($obs_end_time->
+				     subtract_datetime_absolute($dt_end)->seconds())/
+				     ($desired_baseline*3600);
+	}	    
+
+
+	# SVG tags for displaying the transit.  We want everything in
+	# decimal hours, passed in relative to ingress: 
+
+        my $svg_path = "";
+
+        unless ($observing_from_space) {
+	   # Get the full-transit path to stroke in a lighter color: 
+           $svg_path .= transit_svg({ start => -$desired_baseline, 
+		  		      end => $eclipse_width + $desired_baseline,        
+				      egress => ($dt_end -
+						     $dt_start)->to_hrs,        
+				      depth => $depth,
+				      desired_baseline => $desired_baseline, 
+				      class => 'grey',
+				     }); 
+        }
+
+        # Draw the observable part of the transit in a different
+        # color:
+        $svg_path .= transit_svg({ start => ($obs_start_time -
+					         $dt_start)->to_hrs, 
+				   end => ($obs_end_time -
+					           $dt_start)->to_hrs,        
+				   egress => ($dt_end -
+					              $dt_start)->to_hrs,        
+				   depth => $depth,
+				   desired_baseline =>
+				                    $desired_baseline, 
+				   class => 'active',
+				  }); 
+
+	# Also get information about the moon phase and distance from
+	# our target, at mid-transit time: 
+	$moon->datetime($dt);
+	$sun->datetime($dt);
+	$target->datetime($dt);
+
+	my ($ra_moon, $dec_moon) = $moon->radec; 
+	my ($ra_sun, $dec_sun) = $sun->radec; 
+	my ($ra_target, $dec_target) = $target->radec;
+
+	# Moon illumination formula from Meeus, "Astronomical
+	# Algorithms".  Formulae 46.1 and 46.2 in the 1991 edition,
+	# using the approximation cos(psi) \approx -cos(i).  Error
+	# should be no more than 0.0014 (p. 316).
+
+	my $moon_illum =  0.5 * (1. - sin($dec_sun)*sin($dec_moon) -
+				 cos($dec_sun)*cos($dec_moon)*
+				 cos($ra_sun - $ra_moon));
+
+	my $moon_distance_deg = Astro::PAL::palDsep($ra_moon,
+						    $dec_moon, 
+						    $ra_target,
+						    $dec_target) *
+							Astro::PAL::DR2D; 
+
 
 	# Get the *local* date and day of week of the sunset
 	# at the start of the night of this eclipse.  This is
@@ -1157,15 +1815,11 @@ sub get_eclipses {
 	# timezone specified by the user. Instead, we use the
 	# longitude to determine a roughly-correct offset from
 	# UTC, and use that timezone for determining the local
-	# evening date.  This calculation returns a string like
-	# "-0500" that gives the approximate number of hours
-	# that we are offset from UTC; such a string can be
-	# used in place of a timezone name:
+	# evening date.  Note that this approximate timezone was
+	# already calculated above to specify the correct local start
+	# date. 
 
-	my $timezone_offset = sprintf("%+03d00",
-				      $observatory_longitude*24./360.);
-
-	# Get the correct local sunset date for the
+	# First, get the correct local sunset date for the
 	# eclipse. We set the time to the mid-point of the
 	# eclipse, and then check conditions to see if the
 	# evening sunset associated with this date comes
@@ -1189,26 +1843,59 @@ sub get_eclipses {
 	}
 
 
+	# Before shifting timezones, grab the UT dates of 
+	# sunset and sunrise; useful for some observers in 
+	# scheduling:
+	my $sunset_time_UTC =  sprintf("%02d:%02d",
+				   $sunset_object->hour,
+				   $sunset_object->minute);
+
+	my $sunset_UTC_datetime = sprintf("%s %s",
+				      $sunset_object->ymd, 
+				      $sunset_time_UTC);
+
+	my $sunrise_time_UTC =  sprintf("%02d:%02d",
+				   $sunrise_object->hour,
+				   $sunrise_object->minute);
+
+	my $sunrise_UTC_datetime = sprintf("%s %s",
+				      $sunrise_object->ymd, 
+				      $sunrise_time_UTC);
+
 	# Now that we have the right sunset, we can set it to
 	# our shifted timezone and find the date associated
 	# with it:
-	$sunset_object->set_time_zone($timezone_offset);
-
-	# Get the local date of sunset in this longitude-based
-	# timezone: 
-	my $sunset_local_date = $sunset_object->day_abbr . ". " .
-	  sprintf("%02d-%02d-%04d", $sunset_object->month, 
-		  $sunset_object->day, $sunset_object->year);
-
-
-	# Get times of sunset and sunrise in desired timezone:
-	$sunrise_object->set_time_zone($observatory_timezone);
-	my $sunrise_time = $sunrise_object->hms;
 	$sunset_object->set_time_zone($observatory_timezone);
-	my $sunset_time = $sunset_object->hms;
-	# Strip the seconds:
-	$sunrise_time =~ s/:\d\d$//;
-	$sunset_time =~ s/:\d\d$//;
+
+	# Get the local date of sunset in this local
+	# timezone.  First string is for table cell display, 
+	# second and third are for other labels. 
+	my $sunset_local_string = $sunset_object->day_abbr . ". " .
+	                          $sunset_object->ymd;
+
+	my $sunset_time_local =  sprintf("%02d:%02d",
+				   $sunset_object->hour,
+				   $sunset_object->minute);
+
+	my $sunset_local_datetime = sprintf("%s %s",
+				      $sunset_object->ymd, 
+				      $sunset_time_local);
+
+
+	# Same for sunrise: 
+	$sunrise_object->set_time_zone($observatory_timezone);
+
+	my $sunrise_local_string = $sunrise_object->day_abbr . ". " .
+	                          $sunrise_object->ymd;
+
+	my $sunrise_time_local =  sprintf("%02d:%02d",
+				   $sunrise_object->hour,
+				   $sunrise_object->minute);
+
+	my $sunrise_local_datetime = sprintf("%s %s",
+				      $sunrise_object->ymd, 
+				      $sunrise_time_local);
+
 
 	# Save the JD of sunset so we know which night we're
 	# referring to, e.g. for an eclipse that just barely
@@ -1219,14 +1906,16 @@ sub get_eclipses {
 
 
 	# Now get some other assorted dates and times that are
-	# used in the output, in the timezone requested by the
-	# user (presumably either the observatory timezone or
-	# UTC):
+	# used in the output.  We store them both in UTC and
+	# in the local timezone:
+
+	my $start_time_UTC = ($dt - $eclipse_half_duration)->hm;
+	my $mid_time_UTC = $dt->hm;
+	my $end_time_UTC = ($dt + $eclipse_half_duration)->hm;
+	
 	$dt->set_time_zone($observatory_timezone);
-	my $local_time = $dt->hms;
-	# Drop the trailing seconds in the output time string:
-	$local_time =~ s/:\d\d$//;
-	my $local_date = $dt->mdy;
+	my $local_time = $dt->hm;
+	my $local_date = $dt->ymd;
 
 
 	# Now find times of the start and end of eclipse:
@@ -1245,13 +1934,11 @@ sub get_eclipses {
 	$dt_start_local->set_time_zone($observatory_timezone);
 	$dt_end_local->set_time_zone($observatory_timezone);
 
-	my $local_date_start = $dt_start_local->mdy;
-	my $local_time_start = $dt_start_local->hms;
-	my $local_date_end = $dt_end_local->mdy;
-	my $local_time_end = $dt_end_local->hms;
-	# Drop the trailing seconds in the output time strings:
-	$local_time_end =~ s/:\d\d$//;
-	$local_time_start =~ s/:\d\d$//;
+	my $local_date_start = $dt_start_local->ymd;
+	my $local_time_start = $dt_start_local->hm;
+	my $local_date_end = $dt_end_local->ymd;
+	my $local_time_end = $dt_end_local->hm;
+
 
 	# Make up a hash with all the bits of info, to return:
 	my %eclipse;
@@ -1281,27 +1968,115 @@ sub get_eclipses {
 				   - 2450000);
 	$eclipse{jd_mid} = sprintf("%0.3f", $eclipse_jd
 				   - 2450000);
+        
+	$eclipse{obs_end_jd} = sprintf("%0.3f", $obs_end_jd
+				   - 2450000);
+        
 	$eclipse{start_time} = $local_time_start;
-	$eclipse{start_el} = sprintf("%02d",$el_start_deg);
+	$eclipse{start_time_UTC} = $start_time_UTC;
+	$eclipse{start_az} = sprintf("%0.0f",$az_start_deg);
+	$eclipse{start_el} = sprintf("%02.0f",$el_start_deg);
+	$eclipse{start_ha} = sprintf("%+04.1f",$ha_start);
 	$eclipse{start_date} = $local_date_start;
+	$eclipse{start_date_UTC} = $start_date_utc;
 	$eclipse{mid_time} = $local_time;
-	$eclipse{mid_el} = sprintf("%02d",$el_mid_deg);
+	$eclipse{mid_time_UTC} = $mid_time_UTC;
+	$eclipse{mid_az} = sprintf("%0.0f",$az_mid_deg);
+	$eclipse{mid_el} = sprintf("%02.0f",$el_mid_deg);
+	$eclipse{mid_ha} = sprintf("%+04.1f",$ha_mid);
 	$eclipse{mid_date} = $local_date;
+	$eclipse{mid_date_UTC} = $mid_date_utc;
 	$eclipse{end_time} = $local_time_end;
-	$eclipse{end_el} = sprintf("%02d",$el_end_deg);
+	$eclipse{end_time_UTC} = $end_time_UTC;
+	$eclipse{end_az} = sprintf("%0.0f",$az_end_deg);
+	$eclipse{end_el} = sprintf("%02.0f",$el_end_deg);
+	$eclipse{end_ha} = sprintf("%+04.1f",$ha_end);
 	$eclipse{end_date} = $local_date_end;
-	$eclipse{sunrise_time} = $sunrise_time;
-	$eclipse{sunset_time} = $sunset_time;
-	$eclipse{sunset_local_date} = $sunset_local_date;
+	$eclipse{end_date_UTC} = $end_date_utc;
+        $eclipse{time_unc} = $midtime_uncertainty_string;
+	$eclipse{sunrise_time_local} = $sunrise_time_local;
+	$eclipse{sunset_time_local} = $sunset_time_local;
+	$eclipse{sunset_local_datetime} = $sunset_local_datetime;
+	$eclipse{sunrise_local_datetime} = $sunrise_local_datetime;
+	$eclipse{sunset_local_string} = $sunset_local_string;
+	$eclipse{sunrise_time_UTC} = $sunrise_time_UTC;
+	$eclipse{sunset_time_UTC} = $sunset_time_UTC;
+	$eclipse{sunset_UTC_datetime} = $sunset_UTC_datetime;
+	$eclipse{sunrise_UTC_datetime} = $sunrise_UTC_datetime;
+	$eclipse{moon_illum} = sprintf("%0.0f", $moon_illum*100); 
+        if ($moon_distance_deg < 1) {
+	   $eclipse{moon_dist} = sprintf("%0.1f", $moon_distance_deg); 
+        } else {
+	   $eclipse{moon_dist} = sprintf("%0.0f", $moon_distance_deg); 
+        }
+        # An arbitary measure of moon fullness and angular distance, 
+        # used for highlight problematic cases in the output: 
+        $eclipse{moon_metric} = 100*$moon_illum + 1000/$moon_distance_deg;
 	$eclipse{coords} = $ra_string . " " . $dec_string;
 	$eclipse{ra} = $ra_string;
 	$eclipse{dec} = $dec_string;
+	$eclipse{ra_deg} = sprintf("%0.5f", $ra_deg);
+	$eclipse{dec_deg} = sprintf("%0.5f", $dec_deg);
 	$eclipse{comments} = $comments;
 	$eclipse{priority} = $priority;
+        $eclipse{period} = sprintf("%0.2f",$period);
+        # Above is nicely-formatted period; below is full period to
+	# whatever precision we know it, for CSV output for scripting: 
+        $eclipse{period_raw} = $period;
+        $eclipse{period_unc} = $period_uncertainty;
+        $eclipse{epoch} = $epoch;
+        $eclipse{epoch_unc} = $epoch_uncertainty;
 	$eclipse{depth} = $depth;
 	$eclipse{duration} = $eclipse_duration_string;
+	$eclipse{duration_hrs} = $eclipse_width;
+
+        # Fill in all the variables related to baseline: 
+	$eclipse{baseline_hrs} = $show_unc ? 
+                                   sprintf("%0.1f", $baseline_hrs + $midtime_uncertainty_hours) : 
+                                   sprintf("%0.1f", $baseline_hrs);
+	$eclipse{az_pre} = sprintf("%0.0f", $az_pre);
+        $eclipse{az_post} = sprintf("%0.0f", $az_post);
+        $eclipse{el_pre} = sprintf("%0.0f", $el_pre);
+        $eclipse{el_post} = sprintf("%0.0f", $el_post);
+        $eclipse{ha_pre} = sprintf("%+0.1f", $ha_pre);
+        $eclipse{ha_post} = sprintf("%+0.1f", $ha_post); 
+        $eclipse{pre_time} = $pre_time;
+        $eclipse{post_time} = $post_time; 
+        $eclipse{pre_time_UTC} = $pre_time_UTC;
+        $eclipse{pre_date_UTC} = $pre_date_UTC;
+        $eclipse{post_time_UTC} = $post_time_UTC; 
+        $eclipse{post_date_UTC} = $post_date_UTC; 
+        $eclipse{is_daytime_pre} = $is_daytime_pre; 
+        $eclipse{is_daytime_post} = $is_daytime_post; 
+        $eclipse{is_observable_baseline} = $is_observable_baseline; 
+        $eclipse{mid_is_observable} = $mid_is_observable; 
+
+        $eclipse{obs_start_time} = $obs_start_time->hm;
+        $eclipse{obs_end_time} = $obs_end_time->hm;
+        $eclipse{transit_fraction} = sprintf("%0.0f", $transit_fraction);  
+        $eclipse{baseline_fraction} = sprintf("%0.0f", $baseline_fraction);  
+        $eclipse{svg_path} = $svg_path;
+
+        $obs_start_time->set_time_zone('UTC');
+        $eclipse{obs_start_utc} = sprintf("%s %s",
+				       $obs_start_time->ymd, 
+				       $obs_start_time->hm);
+
+
+        $obs_end_time->set_time_zone('UTC');
+        $eclipse{obs_end_utc} = sprintf("%s %s",
+				       $obs_end_time->ymd, 
+				       $obs_end_time->hm);
+
 	# Count to be filled in after sorting:
 	$eclipse{similar_count} = 0;
+        
+        $eclipse{single_object} = $single_object;
+        $eclipse{tess} = $tess;
+        if ($tess) {
+           $eclipse{disposition} = $param_ref->{"TFOPWG Disposition"};
+           $eclipse{priority} = $param_ref->{"Master"};
+        }
 
         # Call the subroutine that constructs a URL for a 
         # unique page about this target; it will be linked 
@@ -1321,6 +2096,7 @@ sub get_eclipses {
 	# space:
 
         $eclipse{csv_text} = eclipse_csv_entry(\%eclipse);
+
 
 	push(@local_eclipse_times, $eclipse_jd);
 	push(@local_eclipse_info, \%eclipse);
@@ -1358,8 +2134,6 @@ sub get_observability {
   # pass them in in any particular order.
 
   my ($param_ref) = @_;
-  my $ra_deg = $param_ref->{ra_deg};
-  my $dec_deg = $param_ref->{dec_deg};
   my $ra_string = $param_ref->{ra_string};
   my $dec_string = $param_ref->{dec_string};
   my $name = $param_ref->{name};
@@ -1369,16 +2143,16 @@ sub get_observability {
   my $sunsets = $param_ref->{sunsets};
   my $sunrises = $param_ref->{sunrises};
   my $telescope = $param_ref->{telescope};
-  my $minimum_elevation = $param_ref->{minimum_elevation};
   my $debug = $param_ref->{debug};
   my $base_date = $param_ref->{base_date};
 
 
-  my $target = new Astro::Coords( ra => $ra_deg,
-				  dec => $dec_deg,
+  my $target = new Astro::Coords( ra => $ra_string,
+				  dec => $dec_string,
 				  type => 'J2000',
-				  units => 'degrees',
-				  );
+				  units => 'sexagesimal',
+      );
+
   $target->telescope($telescope);
 
 
@@ -1415,15 +2189,14 @@ sub get_observability {
   # a reference to an empty list.
 
   my @return_vals = ();
-  if ( $max_target_elevation >= $minimum_elevation ) {
+  if ( $max_target_elevation >= 10 ) {
       # Make a clone of the input parameters, which we will return
       # with just a few more fields added:
       my %info = %$param_ref;
-      $info{max_elevation} = sprintf("%d",$max_target_elevation);
-      $max_elevation_time->set_time_zone($observatory_timezone);
-      $info{max_elevation_time} = $max_elevation_time->hms;
-      # Strip the seconds:
-      $info{max_elevation_time} =~ s/:\d\d$//;
+      $info{max_elevation} = sprintf("%0.0f",$max_target_elevation);
+      my $timezone_to_display = $use_utc ? 'UTC' : $observatory_timezone;
+      $max_elevation_time->set_time_zone($timezone_to_display);
+      $info{max_elevation_time} = $max_elevation_time->hm;
       # Get the JD also, for easier sorting;
       $info{max_elevation_jd} 
          = DateTime::Format::Epoch::JD->format_datetime($max_elevation_time);
@@ -1447,53 +2220,6 @@ sub get_observability {
 
 }  # End of sub get_observability
 
-sub RA_hms_to_deg {
-
-  # Convert input (3-element list of RA hours, minutes, seconds of time)
-  # to RA in degrees.  First convert to hours, then multiply by 15 to
-  # get degrees.
-
-  my($ra_hr, $ra_min, $ra_sec) = @_;
-
-  if (($ra_hr >= 24) or ($ra_min >= 60) or ($ra_sec >= 60)) {
-    die "At least one RA element out of range in RA_hms_to_deg: " .
-      "$ra_hr, $ra_min,$ra_sec\n"; 
-  }
-  my $ra_hr_total = $ra_hr + ($ra_min + ($ra_sec/60.))/60.;
-  my $ra_deg = $ra_hr_total * 15.;
-  return($ra_deg);
-}
-
-sub Dec_dms_to_deg {
-
-  # Convert input (3-element list of Dec degrees, arcminutes, arcseconds)
-  # to Dec in degrees.
-
-  my($dec_deg, $dec_min, $dec_sec) = @_;
-
-  if (($dec_deg >= 90) or ($dec_min >= 60) or ($dec_sec >= 60)) {
-    die "At least one DEC element out of range in DEC_dms_to_deg: " .
-      "$dec_deg, $dec_min,$dec_sec\n"; 
-  }
-  my $sign = 0;
-
-  # Get the declination sign.  Don't just compare numerically, because
-  # the degree field might be "-00".  Instead, do a string comparison to
-  # check for a minus sign at the beginning.  NOTE: if the variable with
-  # the input $dec_deg was "-00" but has been manipulated mathematically
-  # and assigned to (as opposed to string assignments) prior to being
-  # passed to the subroutine, it will not retain the leading "-".  Just
-  # in case, check it both ways - this gives the best chance of success.
-
-  if (($dec_deg =~ /^\s*-/) or ($dec_deg < 0)) {
-    $sign = -1;
-    $dec_deg = -1 * $dec_deg;
-  } else {
-    $sign = 1;
-  }
-  my $dec_deg_total = $dec_deg + ($dec_min + ($dec_sec/60.))/60.;
-  return($dec_deg_total*$sign);
-}
 
 sub fatal_error {
 
@@ -1558,166 +2284,7 @@ sub eclipse_csv_entry {
     
 }
 
-sub parse_target_line {
-
-    # Subroutine to take a raw line of text from the input target file,
-    # and split it up into the desired fields.
-
-    # Input: single text string with target info.
-    # Output: (1) reference to a hash that contains the various pieces of
-    # information in named fields; and (2) a cleaned-up version of the
-    # input line that is more suitable for display to the user. 
-
-    # Get the input line:
-    my $line = shift @_;
     
-
-    # Specify the record separator, and use it to split up the line
-    # into fields; This record separator (a comma followed by a
-    # period) makes it straightforward to allow commas to be embedded
-    # within fields themselves.  Spaces on either side of the field
-    # separator are not significant, i.e. they are ignored.  Here we
-    # need to escape the period in the record separator so we can use
-    # it in a regular expression below.
-
-    my $rec_separator = ',\.';
-    
-    # Clean out the weird record separator for nicer display;
-    my $cleaned_line = $line;
-    # Replace record separator with just a comma:
-    $cleaned_line =~ s/$rec_separator/,/g;
-    chomp($cleaned_line);
-    
-    # Now, on to actually processing the data line:
-    # Split out the fields from the input into array @F; note that
-    # we're allowing possible white space around the record separator,
-    # which won't end up being recorded in the field values:
-    my @F = split(/ *$rec_separator */, $line);
-    
-    # Now store the field values in more descriptive variable names,
-    # in a hash that we will eventually return.
-
-    # The fields, by column number (starting with 0):
-    #  0: target name
-    #  1: RA in h:m:s (colon- or space-delimited)
-    #  2: Dec in d:m:s (colon- or space-delimited)
-    #  3: V mag (or other mag)
-    #  4: JD for central transit (i.e. zero point of the ephemeris) +/-
-    #     uncertainty (e.g. "2455867.42 +/- 0.05"); currently the 
-    #     uncertainty part is optional and unused.
-    #  5: Period in days, +/- uncertainty, e.g. "2.131 +/- 0.001" ;
-    #     currently the uncertainty part is optional and unused.
-    #  6: Transit duration, in hours
-    #  7: Comments on the target; these are not used in the processing,
-    #     but they are passed along to the output.
-    #  8: Priority.  Not required, but can be used as a filter.
-    #  9: Depth of the transit in millimag.  Not used in calculations but
-    #     can be a filter for which events to display.
-    # 10: Code that specifies type of photometry requested.  A value
-    #     of 1 means a periodic event; 2 means non-periodic, i.e. 
-    #     ignore period and epoch fields and only try to calculate
-    #     overall observability during the night (e.g. for
-    #     out-of-transit observations); and 3 means both (1+2), i.e.
-    #     this object has periodic events defined by the given 
-    #     ephemeris, but should also be listed in the output for
-    #     "any time" or out-of-transit observations. 
-    
-
-    # Use "t" (for "target") as the name of our hash for this target: 
-    my %t;
-
-    $t{name} = $F[0];
-    my $ra_input = $F[1];
-    my $dec_input = $F[2];
-    $t{vmag} = $F[3];
-    $t{epoch} = $F[4];
-    $t{period} = $F[5];
-    $t{eclipse_width} = $F[6];
-    $t{comments} = $F[7];
-    $t{priority} = $F[8];
-    $t{depth} = $F[9];
-
-    # We default to everything being assumed to be a
-    # periodic/eclipsing/transiting event if it's not specified:
-    if (defined $F[10]) {
-	$t{phot_requested} = $F[10];
-    } else {
-	$t{phot_requested} = 1;
-    }
-
-    # Now do some processing of these raw input values.
-    # Strip any leading or trailing spaces from the name:
-    $t{name} =~ s/^\s*(\w+)\s*$/$1/;
-
-
-    # Epoch and period can both include uncertainties.  Separate them
-    # out here, although we aren't currently using them in the
-    # calculations.  This regular expression searches for two numbers
-    # (perhaps with embedded decimal place) separated by the string
-    # "+/-" or "+-" :
-    my ($epoch_uncertainty, $period_uncertainty);
-    if ($t{epoch} =~ /([\d.]+)\s*\+\/?-\s*([\d.]+)/) {
-	$t{epoch} = $1;
-	$t{epoch_uncertainty} = $2;
-    }
-
-    if ($t{period} =~ /([\d.]+)\s*\+\/?-\s*([\d.eE+-]+)/) {
-	$t{period} = $1;
-	$t{period_uncertainty} = $2;
-    }
-
-
-    # Extract coords from the colon-delimited strings, or possibly
-    # space-delimited strings. 
-    my ($ra_h, $ra_m, $ra_s, $ra_deg);
-    my ($dec_d, $dec_m, $dec_s, $dec_deg, $dec_sign);
-    
-    if ($ra_input =~ /\d:\d+:\d/) { # RA is h:m:s colon-separated
-	($ra_h, $ra_m, $ra_s) = split(":", $ra_input);
-	$t{ra_deg} = RA_hms_to_deg($ra_h, $ra_m, $ra_s);
-    } elsif ($ra_input =~ /\d+ +\d+ +\d+/) {  # RA is h m s space-separated
-	($ra_h, $ra_m, $ra_s) = split(" ", $ra_input);
-	$t{ra_deg} = RA_hms_to_deg($ra_h, $ra_m, $ra_s);
-    } else {  # RA is not in a recognizable format; set it to an empty
-	      # string which we'll trap as an error later.
-	$t{ra_deg} = "";
-    }
-    
-    if ($dec_input =~ /\d:\d+:\d/) {   # Dec is d:m:s colon-separated
-	($dec_d, $dec_m, $dec_s) = split(":", $dec_input);
-	$t{dec_deg} = Dec_dms_to_deg($dec_d, $dec_m, $dec_s);
-    } elsif ($dec_input =~ /\d+ +\d+ +\d+/) {  # Dec is d m s space-separated
-	($dec_d, $dec_m, $dec_s) = split(" ", $dec_input);
-	$t{dec_deg} = Dec_dms_to_deg($dec_d, $dec_m, $dec_s);
-    } else {  # Dec is not in a recognizable format; set it to an empty
-	      # string which we'll trap as an error later.
-	$t{dec_deg} = "";
-    }
-    
-
-    # Save a string that has the sign of the declination.  We need this
-    # because if the declination is between 0 and -1 degree then we
-    # can't get the sign directly by just checking the whole degrees
-    # part of the input, since "-00" is not less than zero (when
-    # compared as a number).
-
-    if ($t{dec_deg} < 0) {
-	$dec_sign = "-";
-    } else {
-	$dec_sign = "+";
-    }
-
-    # Strings for nicely-formatted printing later.  These have the
-    # correct leading zeroes, signs, etc.:
-
-    $t{ra_string} = sprintf("%02d:%02d:%05.2f", $ra_h, $ra_m, $ra_s);
-    $t{dec_string} = sprintf("%s%02d:%02d:%04.1f", $dec_sign, 
-			     abs($dec_d), $dec_m, $dec_s);
-
-    return \%t, $cleaned_line;
-
-}  # End of sub parse_target_line
-
 
 sub target_info_page {
 
@@ -1742,11 +2309,18 @@ sub target_info_page {
     # with target info on it:
     my $name = $target_ref->{name};
     # Replace spaces with underscores:
-    $name =~ s/\s+/_/g;
+    #$name =~ s/\s+/_/g;
+    my ($target_page_url, $target_page_label);
 
-    my $target_page_url = "http://exoplanets.org/detail/$name";
-
-    my $target_page_label = "Exoplanets.org";
+    if (($target_ref->{tess}) and ($name =~ m/TIC (\d+)(\.\d+)? ?/)) {
+	# Then use back-references to those matches to make the URL:
+	my $TIC_ID = $1;
+	$target_page_url = "https://exofop.ipac.caltech.edu/tess/target.php?id=$1";
+	$target_page_label = "ExoFOP";
+    } else {
+	$target_page_url = "https://exoplanetarchive.ipac.caltech.edu/cgi-bin/DisplayOverview/nph-DisplayOverview?objname=$name";
+	$target_page_label = "Exoplanet Archive";
+    }
 
     return $target_page_url, $target_page_label;
 }
@@ -1765,11 +2339,382 @@ sub finding_chart_page {
     my $target_ref = shift @_;
 
     # Use the target name to construct the URL of the page
-    # with the finding chart.
+    # with the finding chart.  If we are running the script
+    # with just a single object as input, presumably we
+    # don't already have a finding chart for it, so 
+    # we create a custom link to generate one on the fly:
 
+    my $chart_url;
     my $name = $target_ref->{name};
-    # Replace spaces with underscores:
-    $name =~ s/\s+/_/g;
-    return "finding_charts/$name.jpg";
+    if ($target_ref->{single_object}) {
+	$chart_url = "/create_finding_chart.cgi?"
+	    . "target=$name"
+	    . "&ra=$target_ref->{ra}"
+	    . "&dec=$target_ref->{dec}";
+    } else {
+	# Replace spaces, slashes, and parens with underscores:
+	$name =~ s%[ \s / \( \) ]+%_%g;
+	# Make sure no underscores at the end of the name:
+	$name =~ s/_+$//;
+	$chart_url = "finding_charts/$name.jpg";
+    }
+    return $chart_url;
+}
 
+sub hours_to_duration {
+
+# Takes as input a (possibly non-integer) number of hours, and returns
+# a DateTime::Duration object.  To create this, we need to find the
+# equivalent integer number of hours, minutes, and seconds.  The
+# seconds value is rounded to the nearest integer.  These integers
+# are useful for initializing DateTime objects, which require integer
+# inputs for all arguments. 
+
+    my $float_hours = shift @_; 
+
+    my $float_minutes = 60.* ($float_hours - int($float_hours));
+    my $float_seconds = 60.* ($float_minutes - int($float_minutes));
+
+    # Initialize the duration object with the integer values, 
+    # using sprintf to get rounding rather than truncation.  
+
+    my $new_duration = DateTime::Duration->
+	new(
+	    hours =>   int($float_hours), 
+	    minutes => int($float_minutes), 
+	    seconds => sprintf("%0.0f", $float_seconds),
+	);
+
+    return $new_duration;
+
+}
+
+sub observable_time {
+
+# Find the earliest (or latest) observable time for a
+# target, given a set of constraints. Overall goal is to find
+# how much before ingress (or after egress) a target can be
+# observed.  The same routine can be used for both cases, 
+# by specifying whether to search forward or backward in 
+# time from a specified starting point.  
+
+# Note that this search is not foolproof.  It assumes that you are
+# passing in the time of an event that is observable with the input
+# constraints, and the question is only how far past that (in either
+# direction) you can also observe. 
+
+# The speed of the search can be increased by using coarser time
+# steps, at the expense of precision of the time constraint
+# returned. The time returned will always be observable, but for, say,
+# a 10-minute time step it could be conservative by up to just shy of
+# 10 minutes. It is only used for the hour angle constraint, not the
+# daytime or elevation constraints. 
+
+# Inputs:  Hash ref 
+
+# pi/180:  degrees to radians; copied from Astro::PAL source.
+    use constant D2R => 0.017453292519943295769236907684886127134428718885417;
+
+
+    my $DEBUG = 0; 
+
+    my ($args) = @_; 
+
+    # Maximum baseline to consider relative to starting point; 
+    # optional, defaults to 1 hour: 
+    if (not defined($args->{'max_baseline'})) {
+	$args->{'max_baseline'} = 1; 
+    }
+
+    my $sign;  # Direction to search 
+
+    # Direction to search; optional, defaults to forward in time. 
+    if ($args->{'backward'}) {  # Empty defaults to False
+	$sign = -1;
+    } else {
+	$sign = 1;
+    }
+
+    # Make the requested baseline (amount by which we extend the start 
+    # or end time) a duration, modified by direction we're going: 
+    my $baseline = hours_to_duration($args->{'max_baseline'} * $sign); 
+
+    # Get time increment: 
+    my $time_step;
+    if ((not defined($args->{'time_step_minutes'})) or
+	 ($args->{'time_step_minutes'} <= 0)) {
+	$time_step = 1;
+    } else {
+	$time_step = $args->{'time_step_minutes'};
+    }
+
+    my $inc = DateTime::Duration->new( minutes => $time_step * $sign); 
+
+    # The start time for searching is the input time, modified by the
+    # requested baseline time.  If the search direction is backward,
+    # then $baseline will be a negative duration, meaning this logic
+    # will extend the initial time (from which we'll search back).
+
+    my $time = $args->{'start_time'} - $baseline;
+    my $target = $args->{'target'};
+
+    # Debugging
+    my $search_start = $time;
+
+
+    # Start with the daytime constraint. 
+
+    my $sun = $args->{'sun'};
+    $sun->datetime($time);
+
+    if ( $sun->el(format=>'rad') > $args->{'twilight_rad'} ) {
+	if ($sign == 1){
+	    # Next sunset: 
+	    $time = $sun->set_time( horizon => $args->{'twilight_rad'});
+	} else {
+	    # Previous sunrise:
+	    $time = $sun->rise_time( horizon =>
+				     $args->{'twilight_rad'}, 
+		                     event => -1);
+	}
+    }
+
+
+    if ($DEBUG) {
+	$sun->datetime($time);
+	my $temp_el =  $sun->el(format=>'deg'); 
+	print "<br /> Sun elevation $temp_el at $time.\n"; 
+    }
+
+    $target->datetime($time);
+    my $el =  $target->el(format=>'deg');
+
+    # Now deal with elevation constraints.  We check the elevation and
+    # if that's fine, we go on. If not, we find the time after that
+    # (or prior to that) when it was at the limiting elevation:
+
+    if ($el < $args->{'minimum_elevation'}) {
+	if ($sign == 1){
+	    # Next rise: 
+	    $time = $target->rise_time( horizon => 
+					D2R*$args->{'minimum_elevation'});
+	} else {
+	    # Previous set:
+	    $time = $target->set_time( horizon =>
+				       D2R*$args->{'minimum_elevation'}, 
+				       event => -1);
+	}
+	$target->datetime($time);
+	$el =  $target->el(format=>'deg');
+    }
+
+    if ($DEBUG) {
+	print "<br />El $el at $time.\n"; 
+    }
+
+    
+    # Having gotten into the regime where elevation is OK, we now
+    # satisfy the hour angle constraint:
+
+    my $ha =  $target->ha(format=>'hour');
+    while (($ha < $args->{'minimum_ha'}) or ($ha > $args->{'maximum_ha'})) {
+	$time = $time + $inc;
+	$target->datetime($time);
+	$ha =  $target->ha(format=>'hour');
+    }
+
+    if ($DEBUG) {
+	print "<br />HA $ha at $time.\n"; 
+    }
+    
+    
+    # Just to double-check, make sure the elevation is still
+    # OK at the possibly-shifted time we've found:
+    $target->datetime($time);
+    $el =  $target->el(format=>'deg');
+
+    # Check, but allow a little rounding error: 
+    if ($el + 1 < $args->{'minimum_elevation'}) {
+	my $inc_string = $inc->in_units( 'minutes' );
+	my $message = "Error with elevation calculation in sub observable_time" .
+	    ". Elevation is $el at time $time. (HA $ha, start time" . 
+	    " $args->{'start_time'} Inc $inc_string search start $search_start  \n";
+	$message .= "Baseline $args->{'max_baseline'}.\n"; 
+	if (defined($args->{'name'})) {
+	    $message .= "Target $args->{'name'}\n";
+	}
+	fatal_error($message);
+    } elsif  (($ha < $args->{'minimum_ha'}) or ($ha > $args->{'maximum_ha'})) {
+	my $message = "Error with hour angle calculation in sub observable_time" .
+	    ". Hour angle is $ha at time $time.\n";
+	fatal_error($message);
+    }
+
+    return $time; 
+    
+}
+
+sub DateTime::hm {
+  # Just a simple shortcut for formatting ease, since the 
+  # DateTime package doesn't provide a built-in method for 
+  # only hours and minutes: 
+  my $self = shift;
+  return $self->format_cldr("HH:mm");
+}
+
+
+sub DateTime::Duration::to_hrs {
+    # Given a DateTime::Duration object, return it in decimal hours.
+    # Good only to the nearest second, and good only for durations
+    # less than a month. 
+
+    my $dur = shift; 
+
+    my $sign = $dur->is_negative() ? -1 : 1;
+
+    # These named method always return positive numbers, so multiply sum by the sign: 
+    return $sign * (($dur->weeks * 7 + $dur->days) * 24 + $dur->hours + $dur->minutes/60. +
+		    $dur->seconds/3600.);
+
+}
+
+
+
+sub transit_svg {
+    # Return an HTML SVG path that will depict the observable part of a
+    # transit, including baseline. 
+
+
+    # Inputs are three times in decimal hours, relative to the 
+    # ingress time: 
+    # start: start of the observable window (and thus the SVG trace)
+    # egress
+    # end: end of the observable window. 
+
+    # It is always the case that start < end, and ingress < egress,
+    # but the two pairs can be intermixed, e.g. we might not be able
+    # to start observing until after ingress. 
+
+
+    # Conversion factors from hours to pixels (for x), depth in ppt
+    # to pixels (for y), and number of pixels to offset the y values 
+    # from zero; adjust as needed:
+
+    use constant { H2P_default => 150, # Horiz. hours-to-pix scale
+		   D2P => 25,  # Depth ppt-to-pix scale
+		   YTOP => 15, # Offset above
+		   YHEIGHT => 540, # Y space available
+		   XWIDTH => 1000,  # X space available
+		   MINDEPTH => 0.5, # Scale shallow transits to at
+				    # least this min depth 
+		   MAXWIDTH => 5,  # Max duration hrs before trunc
+    };
+
+    my ($a) = @_; 
+
+    # Assigning this to a variable since we may have to tweak it: 
+    my $H2P = H2P_default; 
+
+    # Shift reference point from ingress at zero, to maximum desired
+    # baseline at zero for start of the plot: 
+
+    # Since ingress was at zero, it now sits at baseline: 
+    my $ingress =  $a->{'desired_baseline'}; 
+
+    my ($start, $end, $egress) = 
+	($a->{'start'} + $ingress, 
+	 $a->{'end'} + $ingress,
+	 $a->{'egress'} + $ingress,
+	); 
+
+    my $mid = $ingress + 0.5*($egress - $ingress); 
+
+    # Check if duration too wide to show: 
+    my $wide = ($egress - $ingress) > MAXWIDTH;
+
+    if ($wide) {
+	# Change the y scaling to make the whole transit fit; 
+	# We'll flag this later with a hash mark:
+	$H2P /= ($egress - $ingress) / MAXWIDTH;
+    }    
+
+    my $class = '';
+    if (defined $a->{'class'}) {
+	$class = 'class="' . $a->{'class'} . '"';
+    }
+
+    my $xstart = sprintf("%0.0f", $H2P * $start);
+    my $xend = sprintf("%0.0f", $H2P * $end);
+    my $ydepth = sprintf("%0.0f", D2P * max($a->{'depth'}, MINDEPTH)); 
+    my $yzero = YTOP;
+
+    # We always want the midpoint of the transit to sit at the
+    # x-midpoint defined by the width XWIDTH, so transform as needed: 
+    my $transform = sprintf("transform=\"translate(%0.0f)\"", 0.5*XWIDTH
+			    - $mid*$H2P); 
+
+    my $deep = 0;
+    # Make sure the bottom stays in view: 
+    if (($ydepth + $yzero) > YHEIGHT) {
+	$ydepth = YHEIGHT - $yzero;
+	$deep = 1;	
+    }
+
+    # Hash pattern to show part of depth missing on graph:
+    my $h1 = 30;
+    my $hash = sprintf("l %d %d l %d %d l %d %d", $h1, $h1, -2*$h1,
+		       -2*$h1, $h1, $h1);
+
+    my $y_half = sprintf("%0.0f", $ydepth * 0.5); 
+
+    # Start the path tag: 
+    my $path = "<path $class $transform d=\""; 
+
+    # Fully out-of-transit partials, just a line: 
+    if (($end <= $ingress) or ($start >= $egress)) {
+	$path .= "M $xstart $yzero H $xend" . '"/>';
+	return $path;
+    }
+
+
+    my $y_delta = $ydepth;
+
+    if ($start <= $ingress) {
+	my $xingress = sprintf("%0.0f", $H2P * $ingress);
+	$path .= "M $xstart $yzero H $xingress ";
+	if ($deep) {
+	    # Skip a bit of path and show hashes on the gap: 
+	    $path .= "v $y_half $hash m 0 100 $hash ";
+	    $y_delta -= 100 + $y_half;
+	}
+	$path .= "v $y_delta ";
+    } else {  # Starts in mid-transit: 
+	my $ystart = $yzero + $ydepth;
+	$path .= "M $xstart $ystart "; 
+    }
+
+    if ($end > $egress) {
+	# Extend and draw the egress:
+	my $xegress = sprintf("%0.0f", $H2P * $egress);
+	$path .= "H $xegress "; 
+	$y_delta = $ydepth;
+	if ($deep) {
+	    my $y_up = -$y_half + 100;
+	    # Skip a bit of path: 
+	    $path .= "v $y_up $hash m 0 -100 $hash ";
+	    $y_delta = $y_half;
+	}
+	$path .= "v -$y_delta ";
+    }
+
+    $path .= "H $xend "; 
+    
+    # If it was too wide and we drew that part of the transit, add a
+    # has mark to show that: 
+    if ($wide and ($start < $mid) and ($end > $mid)) {
+	$path .= sprintf("M %0.0f %0.f %s", $mid*$H2P, $ydepth + $yzero, $hash);
+    }
+
+    return $path . '"/>';;
+    
 }
