@@ -1,0 +1,15 @@
+finding_charts
+src
+untracked/
+*.tar.gz
+*.jpg
+test_*
+*.xlsx
+*~
+*targets*.csv
+#*#
+nytprof*
+.*DS_Store
+__pycache__
+jquery*.css
+exoplanet_archive_transits*.txt
