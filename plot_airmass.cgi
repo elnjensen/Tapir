@@ -1,10 +1,10 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl
 
 # Script to create an SVG plot of airmass vs. time for an astronomical
 # target.  Input parameters are provided by airmass.cgi, which calls
 # this script. 
 
-# Copyright 2012-2016 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2018 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -25,10 +25,19 @@
 # along with this program, in the file COPYING.txt.  If not, see
 # <http://www.gnu.org/licenses/>.
 
+# Updated 2017-10-24: fix bug relating to small decimal values in RA
+# or Dec fields, which were being incorrectly interpreted as radians. 
+
+# Updated 2018-03-12: reformat dates/times being passed into the
+# plotting routine to be sure timezone information is embedded within
+# the date string and thus will be interpreted correctly for
+# plotting. 
+
 
 use Astro::Coords;
 use Astro::Telescope;
 use DateTime::Format::Epoch::JD;
+use DateTime::Format::RFC3339;
 use SVG::TT::Graph::TimeSeries;
 use CGI;
 use CGI::Cookie;
@@ -173,8 +182,8 @@ my $dec = $q->param("dec");
 my $target_input = $q->param("target");
 
 # Choose an alternate Vizier mirror if one isn't working:
-my $vizier_mirror = "http://cdsweb.u-strasbg.fr/cgi-bin/";
-#my $vizier_mirror = "http://vizier.cfa.harvard.edu/viz-bin/";
+#my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
+my $vizier_mirror = "http://vizier.cfa.harvard.edu/cgi-bin/";
 
 if (($ra eq '') and ($target_input ne '')) {
     # No RA given, try to resolve name with Simbad:
@@ -223,19 +232,41 @@ if (($ra eq '') and ($target_input ne '')) {
 
 my $sun = new Astro::Coords(planet => "sun");
 
+# If the coords are in decimal form, and are less than 2 pi, then 
+# they get interpreted by Astro::Coords as radians (which surely
+# isn't the user's intent), so we need to identify when we have
+# sexagesimal vs. decimal, and label accordingly.  We assume that
+# sexagesimal can be either whitespace-delimited or colon-delimited. 
+# If we're using decimal, then we multiply RA by 15 to convert from 
+# hours to degrees, since declination will be in degrees, and we can't
+# mix the two formats.  
+
+my $coord_format; 
+my $original_ra = $ra;
+
+if ($ra =~ /\d[:\s]+\d/) {
+    $coord_format = 'sexagesimal';
+} else {
+    $coord_format = 'degrees'; 
+    $ra = $ra * 15;  # Convert from hours to degrees.
+}
+
+
 my $target = new Astro::Coords( ra => $ra,
 				dec => $dec,
 				type => 'J2000',
+				units => $coord_format,
 				);
 
-if ((not defined($target)) or ($ra >= 24)) {
+if ((not defined($target)) or ($original_ra >= 24)) {
     my $err_title = "Could not parse coordinates";
-    my $err_message = "Could not parse the coordinates RA = [$ra]" 
+    my $err_message = "Could not parse the coordinates RA = [$original_ra]" 
 	. " and/or Dec = [$dec].<br />  Note: square brackets are not part"
 	. " of the input, but are used to show whether the coords "
 	. " have spaces or may be empty strings. <br />"
 	. "Also note that RA must be in <b>hours</b> (either decimal "
-	. "or sexagesimal), not degrees, and therefore must be < 24.";
+	. "or sexagesimal), not degrees, and therefore must be < 24." 
+	. "RA and Dec must both be in the same format.";
     fatal_error($err_title, $err_message);
 }
 
@@ -284,14 +315,17 @@ if ($jd =~ /\d+/) {  # JD is some set of numbers, use it:
 			"Could not parse date [$start_date_string]; " 
 			. "must be 'today' or in MM-DD-YYYY format. $hint");
 	}
-	# Start at noon UTC on requested day:
+	# Start at local noon on requested day:
 	$now = DateTime->new(
 			     year => $year,
 			     month => $month,
 			     day => $day,
 			     hour => '12',
-			     time_zone => 'UTC',
+			     time_zone => $timezone,
 			     );
+	# But change the time object to UTC for subsequent use:
+	$now->set_time_zone('UTC');
+
     }  # End of block for non-'today' string
 }  # End of block for parsing date string
 
@@ -372,7 +406,7 @@ my $title = "Airmass plot";
 if ($target_input ne '') {
     $title .= " for $target_input";
 }
-my $subtitle = "RA = $ra, Dec = $dec\; $observatory_name "
+my $subtitle = "RA = $original_ra, Dec = $dec\; $observatory_name "
     . "Lat, long = $observatory_latitude, $observatory_longitude";
 
 my $date_label = "";
@@ -397,6 +431,7 @@ my $graph = SVG::TT::Graph::TimeSeries->new({
     'max_scale_value'     => 1,
     'scale_divisions'     => 0.2,
     'timescale_divisions' => '2 hours',
+    'timescale_time_zone' => $timezone,
 
     'show_x_title'        => 1,
     'x_title'             => "Time in zone $timezone on $start_date $date_label",
@@ -420,6 +455,12 @@ my $time = $start->clone();
 
 my @data = ();
 
+# Create an object we will use to reformat the datetime values into a
+# format that the plotting routine will parse correctly, including an
+# embedded timezone: 
+
+my $formatter = DateTime::Format::RFC3339->new();
+
 while ($time <= $end) {
     $target->datetime($time);
     my $airmass = $target->airmass();
@@ -431,7 +472,8 @@ while ($time <= $end) {
     # Strip a leading zero if present:
     $time_label =~ s/^0//;
     my $label = sprintf("%s, %0.2f",  $time_label, $airmass);
-    push @data, [$time->datetime(), $airmass, $label];
+    my $datestring = $formatter->format_datetime($time);
+    push @data, [$datestring, $airmass, $label];
     $time->set_time_zone('UTC');
     $time->add( minutes=>5 );
 }
@@ -446,8 +488,9 @@ $graph->add_data(
 
 my @sunset_data = ();
 $sunset->set_time_zone($timezone);
-push @sunset_data, ($sunset->datetime(), 100);
-push @sunset_data, ($sunset->datetime(), -1);
+my $sunset_string = $formatter->format_datetime($sunset);
+push @sunset_data, ($sunset_string, 100);
+push @sunset_data, ($sunset_string, -1);
 
 $graph->add_data({
     data => \@sunset_data,
@@ -456,8 +499,9 @@ $graph->add_data({
 
 my @sunrise_data = ();
 $sunrise->set_time_zone($timezone);
-push @sunrise_data, ($sunrise->datetime(), 100);
-push @sunrise_data, ($sunrise->datetime(), -1);
+my $sunrise_string = $formatter->format_datetime($sunrise);
+push @sunrise_data, ($sunrise_string, 100);
+push @sunrise_data, ($sunrise_string, -1);
 
 $graph->add_data({
     data => \@sunrise_data,
@@ -476,8 +520,9 @@ if ($jd_start ne "") {
     $transit_start_label =~ s/:\d\d$//;
     if ($transit_start >= $start) {
 	$transit_start_frac = ($transit_start->epoch - $start->epoch)/$span;
-	push @start_data, ($transit_start->datetime(), 100);
-	push @start_data, ($transit_start->datetime(), -1);
+	my $transit_start_string = $formatter->format_datetime($transit_start);
+	push @start_data, ($transit_start_string, 100);
+	push @start_data, ($transit_start_string, -1);
 	$graph->add_data({
 	    data => \@start_data,
 	    title => 'Transit start',
@@ -498,8 +543,9 @@ if ($jd_end ne "") {
     $transit_end_label = $transit_end->hms;
     $transit_end_label =~ s/:\d\d$//;
     if ($transit_end <= $end) {
-	push @end_data, ($transit_end->datetime(), 100);
-	push @end_data, ($transit_end->datetime(), -1);
+	my $transit_end_string = $formatter->format_datetime($transit_end);
+	push @end_data, ($transit_end_string, 100);
+	push @end_data, ($transit_end_string, -1);
 	$transit_end_frac = ($transit_end->epoch - $start->epoch)/$span;
 	$graph->add_data({
 	    data => \@end_data,
