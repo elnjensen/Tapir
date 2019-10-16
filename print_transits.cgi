@@ -1062,7 +1062,7 @@ if ($print_html) {
 	  . " $max_eclipses_to_print events. "
           . "To search all targets, set tighter constraints"
           .  " or use a shorter time window.";
-      if ($print_html) {
+      if ($print_html == 1) {
 	  print $q->h2($max_message);
       } else {
 	  print $max_message;
@@ -1070,7 +1070,7 @@ if ($print_html) {
   }
 
 
-  if ($print_html) {
+  if ($print_html == 1) {
       my $timezone_to_display = $use_utc ? 'UTC' : $observatory_timezone;
       print $q->h2("Upcoming events for the next $days_to_print $day_word"
 		   . " $past_string from $start_date_string;"
