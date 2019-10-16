@@ -201,6 +201,18 @@ our %observatories_western_north_america = (
 	   },
 
 
+	   "Red Buttes Observatory, Wyoming" => {
+	       latitude => 41.17642,
+	       longitude => -105.57403,
+	       timezone => 'MST7MDT',
+	   },
+
+	   "Wyoming Infrared Observatory (WIRO)" => {
+	       latitude => 41.09706,
+	       longitude => -105.97653,
+	       timezone => 'MST7MDT',
+	   },
+
 					   );
 
 
@@ -356,6 +368,14 @@ our %observatories_south_america = (
 	       timezone => 'America/Santiago',
 	   },
 
+	   "ALMA" => {
+	       latitude => -23.029,
+	       longitude => -67.755,
+	       timezone_integer => 4,
+	       timezone => 'America/Santiago',
+	   },
+
+
 	   "Las Campanas Observatory" => {
 	       latitude => -29.003333,
 	       longitude => -70.701667,
@@ -420,9 +440,23 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
+	   "Smith College Observatory, Northampton, MA" => {
+	       latitude => 42.317036,
+	       longitude =>  -72.639514,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
 	   "Moore Observatory, Univ. of Louisville, Kentucky" => {
 	       latitude => 38.344792,
 	       longitude => -85.528475,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
+	   "Harvard Clay Telescope, Cambridge, MA" => {
+	       latitude => 42.3766,
+	       longitude => -71.1169,
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
@@ -449,6 +483,15 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
+
+	   "Michael L. Britton Observatory, Dickinson College, PA" => {
+	       latitude => 40.20398,
+	       longitude => -77.19786,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
+
 	   "Fan Mountain Observatory, VA" => {
 	       latitude => 37.878333,
 	       longitude => -78.693333,
@@ -470,6 +513,13 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
+	   "Sperry Observatory, Union County College, NJ" => {
+	       latitude => 40.66632,
+	       longitude => -74.32327,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
 	   "Peter van de Kamp Observatory, Swarthmore College, PA" => {
 	       latitude => 39.907100,
 	       longitude => -75.355550,
@@ -485,8 +535,8 @@ our %observatories_eastern_us = (
 	   },
 
 	   "Vassar College Observatory, Poughkeepsie, NY" => {
-	       latitude => 41.683,
-	       longitude => -73.8905,
+	       latitude => 41.683011,
+	       longitude => -73.890604,
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
@@ -498,9 +548,16 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
-	   "Middlebury College Observatory, VT" => {
+	   "Mittelman Observatory, Middlebury College, VT" => {
 	       latitude => 44.0134,
 	       longitude => -73.1813,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
+	   "George R. Wallace, Jr. Astrophysical Observatory, MA" => {
+	       latitude => 42.295,
+	       longitude => -71.485,
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
@@ -508,6 +565,13 @@ our %observatories_eastern_us = (
 	   "Foggy Bottom Observatory, Colgate Univ., NY" => {
 	       latitude => 42.81651,
 	       longitude => -75.532568,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
+	   "Breyo Observatory, Siena College, NY" => {
+	       latitude => 42.719546,
+	       longitude => -73.751433,
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
