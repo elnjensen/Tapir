@@ -107,6 +107,9 @@ Options:
  --height: Field height (N-S) in arcminutes.
  --width:  Field width (E-W) in arcminutes.
  --directory: Directory for output.
+ --hardlink-from-dir: Check to see if the chart already exists in the
+                      specified directory, and if so, hardlink to 
+                      that file rather than creating a new one.
  --suffix: Suffix for output image; if recognized by ImageMagick, it
      sets the image type, i.e. you can use
           "--suffix .png" to get a PNG output image; but 
@@ -123,6 +126,12 @@ Options:
  --force: Overwrite pre-existing output file of the same name.
  --verbose: More verbose output about what is happening.
  --quiet: Don\'t print any status messages.
+ --sleep: Sleep the specified number of seconds between successive
+          finding charts; useful if you don\'t want to overtax an 
+	  image server with rapid-fire queries, and don\'t care 
+	  much about how long it takes you to make a bunch of charts.
+ --skip: Number of lines to skip at the beginning of the input. Useful 
+         if your input file has headers that aren\'t commented out.
  --help: Print this help.
 
 END_OF_HELP
@@ -137,8 +146,9 @@ our ($coords_only, $show_detector, $show_guider, $new_suffix,
     $remove_underscores, $detector_string, $guider_string,
     $scale_bar_length, $output_directory, $initial_circle_radius, $verbose,
     $detector_width, $detector_height, $guider_width, $guider_height,
-    $guider_offset_x, $guider_offset_y, $print_help,
-    $original_input, $force_overwrite, $to_stdout, $quiet,
+    $guider_offset_x, $guider_offset_y, $print_help, $sleep_seconds,
+    $original_input, $force_overwrite, $to_stdout, $quiet, $skip,
+    $skipped, $hardlink_from_dir,
     );
 
 BEGIN {
@@ -150,6 +160,7 @@ BEGIN {
 # Read in any command-line options:
     my $success = GetOptions("coordinates" => \$coords_only, 
 			    "directory=s" => \$output_directory,
+			    "hardlink-from-dir=s" => \$hardlink_from_dir,
 			    "guider" => \$show_guider,
 			    "force" => \$force_overwrite,
 			    "stdout" => \$to_stdout,
@@ -161,7 +172,9 @@ BEGIN {
 			    "detector-height=f" => \$detector_height,
 			    "detector-width=f" => \$detector_width,
 			    "suffix=s" => \$new_suffix,
+			    "sleep=f" => \$sleep_seconds,
 			    "invert!" => \$white_background,
+			    "skip=f" => \$skip,
 			    );
     
     if ($print_help or not $success) {
@@ -240,7 +253,11 @@ BEGIN {
     }
 
 # Directory to save images (absolute or relative path):
-    if (not defined($output_directory)) {
+    if (defined($output_directory)) {
+	if (not -e $output_directory) {
+	    die "Output directory \"$output_directory\" does not exist.";
+	}
+    } else {
 	$output_directory = '.';
     }
 
@@ -305,6 +322,15 @@ if ($new_suffix =~ /jpe?g/i) {
 
     $remove_underscores = 1;
 
+# See if we need to skip any lines in the input: 
+    if (defined $skip) {
+	$skip = int($skip);
+    } else {
+	$skip = 0;
+    }
+    # Number skipped so far: 
+    $skipped = 0;
+
 }
 
 ########## End of BEGIN block - basic customization is all above
@@ -319,6 +345,15 @@ if ($new_suffix =~ /jpe?g/i) {
 
 # Skip input lines that are blank or commented out:
 next if ((/^\s*$/) or (/^\#/));
+
+if ($skipped < $skip) {
+    $skipped++;
+    next;
+}
+
+# Some CSV files may have quoted fields; get rid of any embedded
+# double quotes: 
+s/\"//g;
 
 # Split the input line on commas; also allow ",." as a possibility,
 # since that's the delimeter used by the target file for my
@@ -361,13 +396,8 @@ if (scalar(@fields) < 3) {
 	print STDERR "Could not parse/resolve input line: \n$original_input";
 	next;
     } else {
-	$ra1 = $1;
-	$ra2 = $2;
-	$ra3 = $3;
-
-	$dec1 = $4;
-	$dec2 = $5;
-	$dec3 = $6;
+	($ra1, $ra2, $ra3) = split(":", $1);
+	($dec1, $dec2, $dec3) = split(":", $2);
 	$name = $object_name;
 	# Note that in printing out the coordinates, here and below
 	# where we use them for a URL, we treat $dec1 as a string
@@ -400,6 +430,15 @@ if (scalar(@fields) < 3) {
     }
 }
 
+# Make sure we got coordinates: 
+if (not (defined($ra1) and defined($ra2) and defined($ra3) and
+	 defined($dec1) and  defined($dec2) and defined($dec3))) {
+    printf STDERR "For star %s, could not parse coordinates: " . 
+	    "%02d %02d %05.2f %3s %02d %04.1f\n", $name, 
+	    $ra1, $ra2, $ra3, $dec1, $dec2, $dec3;
+    next;
+}
+
 # If they only want coordinates, go to next entry:
 next if ($coords_only);
 
@@ -430,20 +469,42 @@ if ($to_stdout) {
     $new_file =~ s/^\.//;
 } else {
     my $print_name = $name;
-    $print_name =~ s/ +/_/g;
-    $new_file = $output_directory . "/" . $print_name . $new_suffix;
-    # Strip any double-slashes in the filename:
+    # In order for the name we create to play nicely with other
+    # commands, we replace certain characters with underscores: 
+    # spaces, parentheses, and slashes all get changed to
+    # underscores: 
+    $print_name =~ s%[ \s / \( \) ]+%_%g;
+    # This could lead to underscores at the end of the name, which
+    # we don't need:
+    $print_name =~ s/_+$//;
+    my $output_name = $print_name . $new_suffix;
+    $new_file = $output_directory . "/" . $output_name;
+    # Strip any double-slashes in the filename, e.g. if the
+    # output_directory already had a trailing slash:
     $new_file =~ s%//%/%g;    
+
+    # See if the file already exists and has non-zero size - if so,
+    # we're done, just short-circuit the loop (unless the user has
+    # specifically asked to overwrite):
+    if ((-s $new_file) and not ($force_overwrite)) {
+	print STDERR "File $new_file already exists!  (Use --force to overwrite.)"
+	    . " Going to next target.\n";
+	next;
+    }
+
+    # See if we need to check elsewhere for the file: 
+    if ($hardlink_from_dir) {
+	my $test_file = $hardlink_from_dir . $output_name;
+	if (-s $test_file) {
+	    print STDERR "File $test_file exists, creating " . 
+		"hardlink to $new_file.\n";
+	    my $status = link $test_file, $new_file or 
+		die "Could not link file: $!\n";
+	    next;
+	}
+    }
 }
 
-# See if the file already exists - if so, we're done, just
-# short-circuit the loop (unless the user has specifically asked 
-# to overwrite):
-if ((-e $new_file) and not ($force_overwrite)) {
-    print STDERR "File $new_file already exists!  (Use --force to overwrite.)"
-	. " Going to next target.\n";
-    next;
-}
 
 # Execute the command.  Again, we use a function from LWP::Simple 
 # to fetch the image and save it in a file:
@@ -457,7 +518,7 @@ if (is_error($fetch_image_status)) {
 
 # Give the user some feedback about what we're doing:
 print STDERR  "Creating finding chart for object $name, output file"
-    . "$new_file.\n" unless ($quiet);
+    . " $new_file.\n" unless ($quiet);
 
 # Get the image dimensions in pixels:
 
@@ -741,4 +802,10 @@ if ($delete_status == 0) {
     die "Could not delete original image $file; $!\n";
 }
 
+if (defined($sleep_seconds)) {
+    if ($verbose) {
+	print STDERR "Sleeping for $sleep_seconds seconds...\n";
+    }
+    sleep(abs($sleep_seconds));
+}
 
