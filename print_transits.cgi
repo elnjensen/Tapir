@@ -843,38 +843,15 @@ foreach my $target_ref (@lines) {
 
   $target_ref->{phot_requested} = 1;
 
-  # Likewise we assign a placeholder priority: 
-  $target_ref->{priority} = 1;
+  # Likewise we assign a placeholder priority for the non-TESS
+  # targets: 
+  if (not $tess) {
+      $target_ref->{priority} = 1;
+  }
 
   # Just different names for these than are in input file: 
   $target_ref->{ra_string} = $target_ref->{RA};
   $target_ref->{dec_string} = $target_ref->{Dec};
-
-
-  # A few fields in the TOI file have different names.  The "delete"
-  # command here removes the original entry, but also returns the
-  # value it deleted, so this has the effect of just replacing that
-  # key-value pair with a different key name. 
-  if ($tess) {
-      $target_ref->{duration} = delete $target_ref->{"Duration (hours)"};
-      $target_ref->{period} = delete $target_ref->{"Period (days)"};
-      $target_ref->{comments} = delete $target_ref->{"Comments"};
-      $target_ref->{period_uncertainty} = delete $target_ref->{"Period (days) err"};
-      $target_ref->{name} = sprintf("TIC %s (TOI %s)",
-				    $target_ref->{"TIC ID"},
-				    $target_ref->{"TOI"}); 
-      $target_ref->{vmag} = delete $target_ref->{"TESS Mag"};
-      $target_ref->{epoch} = delete $target_ref->{"Epoch (BJD)"};
-      $target_ref->{epoch_uncertainty} = delete $target_ref->{"Epoch (BJD) uncertainty"};
-      $target_ref->{depth} = sprintf("%0.2f", $target_ref->{"Depth (ppm)"}/1000.);  # We want ppt
-      if ((not defined $target_ref->{period}) or 
-	  ($target_ref->{period} == 0) or 
-	  (not defined $target_ref->{epoch}) or 
-	  (not defined $target_ref->{duration}))
-      {
-	  next TARGET_LOOP;
-      }
-  }
 
   # For printing input info if needed: 
   my $cleaned_line = join(", ", map { "$target_ref->{$_}" } keys %$target_ref);
@@ -1282,7 +1259,7 @@ sub get_eclipses {
   my $moon = $param_ref->{moon};
   my $twilight_rad = $param_ref->{twilight_rad};
 
-  my $tess = (defined $param_ref->{'TESS Disposition'}) ? 1 : 0;
+  my $tess = (defined $param_ref->{'disposition'}) ? 1 : 0;
 
   # Before we can calculate eclipse visibility, we need to set up
   # some basics, like the current date and time.
@@ -2074,8 +2051,9 @@ sub get_eclipses {
         $eclipse{single_object} = $single_object;
         $eclipse{tess} = $tess;
         if ($tess) {
-           $eclipse{disposition} = $param_ref->{"TFOPWG Disposition"};
-           $eclipse{priority} = $param_ref->{"Master"};
+           $eclipse{disposition} = $param_ref->{"disposition"};
+           $eclipse{priority} = $param_ref->{"priority"};
+           $eclipse{toi} = $param_ref->{"TOI"};
         }
 
         # Call the subroutine that constructs a URL for a 
@@ -2346,12 +2324,14 @@ sub finding_chart_page {
 
     my $chart_url;
     my $name = $target_ref->{name};
-    if ($target_ref->{single_object}) {
+    if ($target_ref->{single_object}==1) {
 	$chart_url = "/create_finding_chart.cgi?"
 	    . "target=$name"
 	    . "&ra=$target_ref->{ra}"
 	    . "&dec=$target_ref->{dec}";
     } else {
+	# Remove TOI info if present: 
+	$name =~ s/ *\(TOI [\d\.]+\) *//;
 	# Replace spaces, slashes, and parens with underscores:
 	$name =~ s%[ \s / \( \) ]+%_%g;
 	# Make sure no underscores at the end of the name:

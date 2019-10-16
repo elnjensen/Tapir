@@ -86,10 +86,17 @@ Extra stylesheet below modifies the default dataTables one in a few --
      { responsivePriority: 2, targets: [3,4,5,6,12] },
 			 /* RA/Dec, Period */
      { responsivePriority: 3, targets: [10,11] },
-			 /* Comments */ 
-     { responsivePriority: 8, targets: [13] },
 			 /* Azimuth, HA */ 
      { responsivePriority: 10, targets: [8, 9] },
+<TMPL_IF NAME="tess">
+			 /* Comments */ 
+     { responsivePriority: 7, targets: [15] },
+			 /* Priority, disposition */ 
+     { responsivePriority: 8, targets: [13, 14] },
+<TMPL_ELSE>
+			 /* Comments */ 
+     { responsivePriority: 7, targets: [13] },
+</TMPL_IF>
            ],
           order: [[ 5, "asc" ]],
           "drawCallback": function ( settings ) {
@@ -392,7 +399,6 @@ data-tippy-content="Text is highlighted if 2000/(Moon distance) + Moon illum pct
 	  <th> RA &amp; Dec (J2000) </th>
 	  <th> Period (days) </th>
 	  <th> Depth (ppt) </th>
-	  <th> Comments </th>
 	  <TMPL_IF NAME="tess">
 	    <th  class="with_tooltip" data-tippy-content="<div style='text-align:left;'>
 CP = Confirmed Planet <br />
@@ -402,6 +408,7 @@ PC = Planet Candidate <br />
 </div>"> TFOPWG Disposition </th>
 	    <th> Master priority </th>
 	  </TMPL_IF>
+	  <th> Comments </th>
 	</tr>
        </thead>
 <tbody>
@@ -439,7 +446,8 @@ PC = Planet Candidate <br />
 
    <td width="250"><span class="with_tooltip" data-tippy-content="Query the next 90 days for this target."  style="white-space: nowrap"><a
      href="print_transits.cgi?observatory_string=<TMPL_VAR
-     NAME="observatory_string">&use_utc=<TMPL_VAR NAME="use_utc">&observatory_latitude=<TMPL_VAR
+     NAME="observatory_string">&use_utc=<TMPL_VAR NAME="use_utc">&single_object=<TMPL_VAR 
+     NAME="single_object">&observatory_latitude=<TMPL_VAR
      NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
      NAME="observatory_longitude">&timezone=<TMPL_VAR
      NAME="timezone">&days_to_print=90&days_in_past=0&target_string=<TMPL_VAR
@@ -453,7 +461,7 @@ PC = Planet Candidate <br />
      EXPR="time_unc > 0">1</TMPL_IF>&minimum_priority=<TMPL_VAR 
      NAME="minimum_priority">&minimum_depth=<TMPL_VAR 
      NAME="minimum_depth">&print_html=1&twilight=<TMPL_VAR 
-     NAME="twilight">"><TMPL_VAR NAME="name"></a></span>
+     NAME="twilight">"><TMPL_VAR NAME="name"></a></span> <TMPL_IF NAME="tess">(TOI <TMPL_VAR NAME="toi">)</TMPL_IF>
 <br/>Finding charts: 
   <TMPL_IF EXPR="finding_chart">
   <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
@@ -673,12 +681,13 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
 <td align="center" class="with_tooltip" data-tippy-content="RA, Dec in degrees:<br/><TMPL_VAR NAME="ra_deg"><br/><TMPL_VAR NAME="dec_deg">"><br/><TMPL_VAR NAME="ra"><br/><TMPL_VAR NAME="dec"><br/>&nbsp;</td>
 <td align="center"> <TMPL_VAR NAME="period"> </td>
 <td align="center"> <TMPL_VAR NAME="depth"> </td>
-<td align="left"> <div class="scroll" id="comments"> <TMPL_VAR NAME="comments" ESCAPE=HTML> </div> </td>
 
 <TMPL_IF NAME="tess">
   <td align="center"> <TMPL_VAR NAME="disposition"> </td>
   <td align="center"> <TMPL_VAR NAME="priority"> </td>
 </TMPL_IF>
+
+<td align="left"> <div class="scroll" id="comments"> <TMPL_VAR NAME="comments" ESCAPE=HTML> </div> </td>
 
 </tr>
 
