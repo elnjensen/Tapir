@@ -454,8 +454,8 @@ input[type=submit] {
  The output includes transit time and elevation, and links to further
  information about each object, including finding charts and airmass
  plots.  (There are also stand-alone pages for generating <a
- href="finding_charts.cgi">finding charts</a> and <a
- href="airmass.cgi">airmass plots</a> for any target.)  </p>
+ href="https://astro.swarthmore.edu/finding_charts.cgi">finding charts</a> and <a
+ href="https://astro.swarthmore.edu/airmass.cgi">airmass plots</a> for any target.)  </p>
 
 <FORM METHOD="GET" ACTION="print_transits.cgi"> 
 
