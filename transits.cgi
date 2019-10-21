@@ -599,6 +599,12 @@ other target (or try an alternate ephemeris for a known target). </i>
 </tr>
 
 <tr>
+<td>Transit depth (ppt): &nbsp;</td>
+<td><input type="text" size="15"
+    name="depth"  style="text-align:center" /></td>
+</tr>
+
+<tr>
 <td>Target name (<i>optional, for labeling only</i>): &nbsp;</td>
 <td>
 <input type="text" size="15"

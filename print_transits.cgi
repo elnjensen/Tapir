@@ -759,27 +759,23 @@ my $rec_separator = ',.';
 
 my @lines = ();
 if ($single_object==1) {
-    # They have checked the radio button that specifies manual
-    # entry of the ephemeris for a single object, so get the
-    # entered info:
-    my $single_object_name =  $q->param("target");
-    my $single_object_period =  $q->param("period");
-    my $single_object_epoch =  $q->param("epoch");
-    my $single_object_duration =  $q->param("duration");
-    my $single_object_ra =  $q->param("ra");
-    my $single_object_dec =  $q->param("dec");
-    my $target_line = $single_object_name . $rec_separator
-	. $single_object_ra . $rec_separator
-	. $single_object_dec . $rec_separator
-	. " " . $rec_separator
-	. $single_object_epoch . $rec_separator
-	. $single_object_period . $rec_separator
-	. $single_object_duration . $rec_separator
-	. "Manually-entered single object" . $rec_separator
-	. "-1" . $rec_separator
-	. "-1" . $rec_separator
-	. "1";
-    push @lines, $target_line;
+    # They have checked the radio button that specifies manual entry
+    # of the ephemeris for a single object, so get the entered
+    # info. Put these into a hash, since that's what would be returned
+    # if we use a regular target file:
+
+    my %t;
+    $t{'RA'} =  $q->param("ra");
+    $t{'Dec'} =  $q->param("dec");
+
+    $t{'name'} =  $q->param("target");
+    $t{'period'} =  $q->param("period");
+    $t{'epoch'} =  $q->param("epoch");
+    $t{'duration'} =  $q->param("duration");
+    $t{'depth'} =  $q->param("depth");
+    $t{'comments'} =  "Manually-entered single object";
+
+    push @lines, \%t;
     # Effectively disable the filtering on transit depth and
     # priority below by re-setting the threshhold values here.
     # The target doesn't have this info, so we don't want it
