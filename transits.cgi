@@ -415,6 +415,66 @@ input[type=submit] {
   text-align: center;
 }
 
+
+/* The Modal (background) */
+.modal {
+  display: none; /* Hidden by default */
+  position: fixed; /* Stay in place */
+  z-index: 1; /* Sit on top */
+  padding-top: 100px; /* Location of the box */
+  left: 0;
+  top: 0;
+  width: 100%; /* Full width */
+  height: 100%; /* Full height */
+  overflow: auto; /* Enable scroll if needed */
+  background-color: rgb(0,0,0); /* Fallback color */
+  background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+
+/* Modal Content */
+.modal-content {
+  position: relative;
+  background-color: #fefefe;
+  margin: auto;
+  padding: 0;
+  border: 1px solid #888;
+  width: 80%;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
+  animation-name: animatetop;
+  animation-duration: 0.4s
+}
+
+/* Modal Header */
+.modal-header {
+  padding: 2px 16px;
+  color: white;
+}
+
+/* Modal Body */
+.modal-body {padding: 2px 16px;}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 2px 16px;
+  color: white;
+}
+
+/* The Close Button */
+.close {
+  color: #888;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 </style>
 
 
@@ -460,19 +520,49 @@ input[type=submit] {
 <FORM METHOD="GET" ACTION="print_transits.cgi"> 
 
 <h3>Target list:</h3>
-<div class="indent">
-<p>
+<div class="indent p-style">
 <INPUT TYPE="radio" NAME="single_object" VALUE="0" onclick="show_hide(this.value,'1','ephem_block')"
 Checked
 /> NASA Exoplanet Archive database ($n_planets planets; <a
-				    href="transit_targets.csv">CSV file</a>)  <br />
+				    href="transit_targets.csv">CSV
+				    file</a>)  <br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="2" onclick="show_hide(this.value,'1','ephem_block')"
 /> TESS Objects of Interest ($n_planets_tess TOIs; <a
-				    href="toi_targets.csv">CSV file</a>) <br/>
+				    href="toi_targets.csv">CSV
+			     file</a>; <span style="color:#6699cc;cursor:pointer" id="about-tess">About
+			     TESS followup</span>)
+<div class="modal" id="tess-sg1-info">
+ <div class="modal-content">
+  <div class="modal-header">
+    <span class="close">&times;</span>
+    <h2>About TESS Followup</h2>
+  </div>
+  <div class="modal-body">
+    <p>
+       While all TESS Objects of Interest (TOIs) are made public
+       through this ephemeris prediction tool, the TESS Follow-up
+       Observing Program (TFOP) is a mission-led effort to coordinate
+       ground-based follow-up observations of TOIs by professional,
+       student, and citizen astronomers. A separate but similar
+       ephemeris prediction tool is maintained for the TFOP team that
+       includes daily updates to the status and disposition of each
+       TOI, along with a description of observations needed for each
+       active TOI. The TFOP team welcomes all observers with
+       time-series photometry experience to submit applications to
+       join TFOP Sub Group 1 (SG1). A description of the TFOP
+       application process is provided <a
+       href='https://tess.mit.edu/followup/apply-join-tfop'
+       target='_blank'>here</a>.
+    </p>
+  </div>
+ </div>
+</div>
+<br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="1" onclick="show_hide(this.value,'1','ephem_block')"
 /> Single object
     with given ephemeris (date and elevation filters below still
-    apply). <br />
+    apply).<br/>
+<p>
 <div id="ephem_block" class="show_hide">
 <i>Note: to search for a specific known transiting exoplanet, don\'t use this.  Choose
 "NASA Exoplanet Archive database" above, then enter the target name below in the
@@ -594,10 +684,11 @@ if ($use_AND) {
 
 print << "END_2";
 
-&nbsp; <INPUT TYPE="radio" NAME="use_utc" VALUE="1" $utc_on_string/> 
+<p> <INPUT TYPE="radio" NAME="use_utc" VALUE="1" $utc_on_string/> 
 Use UTC &nbsp;/&nbsp;
 <INPUT TYPE="radio" NAME="use_utc" VALUE="0" $utc_off_string/> 
 Use observatory\'s local time.
+</p>
 </div>
 
 <DIV id="lat_long" class="$lat_long_class" style="margin-left:2cm;">
@@ -905,7 +996,40 @@ Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
 >here</a>.
 </p>
+
 </body>
+
+<script type="text/javascript">
+
+// Vars and functions for the modal dialog
+// These have to come after the code for the dialog is in place. 
+    var modal = document.getElementById("tess-sg1-info");
+
+// Get the button that opens the modal
+    var btn = document.getElementById("about-tess");
+
+// Get the <span> element that closes the modal
+    var span = document.getElementsByClassName("close")[0];
+
+// When the user clicks on the button, open the modal
+    btn.onclick = function() {
+	modal.style.display = "block";
+    }
+
+// When the user clicks on <span> (x), close the modal
+    span.onclick = function() {
+	modal.style.display = "none";
+    }
+
+// When the user clicks anywhere outside of the modal, close it
+    window.onclick = function(event) {
+	if (event.target == modal) {
+	    modal.style.display = "none";
+	}
+    } 
+
+</script>
+
 
 </html>
 
