@@ -15,7 +15,7 @@ MAG_FILE_TEMP=${TARG_BASE}_mags_temp.txt
 OUTPUT_FILE=transit_targets.csv
 
 # Working directory: 
-DIR=/home/httpd/html/transit_testing/
+DIR=/home/httpd/html/transits/
 
 cd $DIR
 
