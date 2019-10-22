@@ -529,8 +529,8 @@ Checked
 <INPUT TYPE="radio" NAME="single_object" VALUE="2" onclick="show_hide(this.value,'1','ephem_block')"
 /> TESS Objects of Interest ($n_planets_tess TOIs; <a
 				    href="toi_targets.csv">CSV
-			     file</a>; <span style="color:#6699cc;cursor:pointer" id="about-tess">About
-			     TESS followup</span>)
+			     file</a>; <span style="color:#6699cc;cursor:pointer" id="about-tess">
+			   Apply to join the TESS Follow-up Program</span>)
 <div class="modal" id="tess-sg1-info">
  <div class="modal-content">
   <div class="modal-header">
@@ -540,17 +540,19 @@ Checked
   <div class="modal-body">
     <p>
        While all TESS Objects of Interest (TOIs) are made public
-       through this ephemeris prediction tool, the TESS Follow-up
-       Observing Program (TFOP) is a mission-led effort to coordinate
-       ground-based follow-up observations of TOIs by professional,
-       student, and citizen astronomers. A separate but similar
-       ephemeris prediction tool is maintained for the TFOP team that
-       includes daily updates to the status and disposition of each
-       TOI, along with a description of observations needed for each
-       active TOI. The TFOP team welcomes all observers with
-       time-series photometry experience to submit applications to
-       join TFOP Sub Group 1 (SG1). A description of the TFOP
-       application process is provided <a
+       through this ephemeris prediction tool, the <a
+       href='https://tess.mit.edu/followup/apply-join-tfop'
+       target='_blank'>TESS Follow-up Observing Program (TFOP)</a> is
+       a mission-led effort to coordinate ground-based follow-up
+       observations of TOIs by professional, student, and citizen
+       astronomers. A separate but similar ephemeris prediction tool
+       is maintained for the TFOP team that includes daily updates to
+       the status and disposition of each TOI, along with a
+       description of observations needed for each active TOI. The
+       TFOP team welcomes all observers with time-series photometry
+       experience to submit applications to join TFOP Sub Group 1
+       (SG1). A description of the TFOP application process is
+       provided <a
        href='https://tess.mit.edu/followup/apply-join-tfop'
        target='_blank'>here</a>.
     </p>
