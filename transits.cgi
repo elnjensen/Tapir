@@ -328,6 +328,17 @@ print << "END_1";
 <head>
 <meta content="text/html; charset=utf-8" http-equiv="content-type">
 
+<meta property="og:url"                content="https://astro.swarthmore.edu/transits/" />
+<meta property="og:type"               content="website" />
+<meta property="og:title"              content="Plan exoplanet transit observations" />
+<meta property="og:description"        content=" This form calculates
+observability of the known transiting exoplanets or TESS Objects of Interest
+ (TOIs) are observable from a given location at a given time.
+ The output includes transit time and elevation, and links to further
+ information about each object, including finding charts and airmass
+ plots." />
+<meta property="og:image" content="https://astro.swarthmore.edu/transits/transit_finder_example_small.png" />
+
 <script type="text/javascript">
 
    function hide(obj) {
