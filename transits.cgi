@@ -61,7 +61,7 @@ $n_planets_tess -= 1;
 
 # Declare the settings variables that we'll use:
 my ($observatory_string, $observatory_latitude, $observatory_longitude,
-    $observatory_timezone, $days_to_print, $days_in_past, $minimum_elevation,
+    $observatory_timezone, $days_to_print, $days_in_past,
     $minimum_start_elevation, $minimum_end_elevation, 
     $minimum_ha, $maximum_ha, $baseline_hrs,
     $minimum_depth, $minimum_priority, $maximum_V_mag, $show_unc,
@@ -143,19 +143,12 @@ if (not defined $days_in_past) {
     $days_in_past = 0;
 }
 
-if (defined $cookies{'minimum_elevation'}) {
-    $minimum_elevation = $cookies{'minimum_elevation'}->value;
-}
-if (not defined $minimum_elevation) {
-    $minimum_elevation = ' ';
-}
-
 if (defined $cookies{'minimum_start_elevation'}) {
     $minimum_start_elevation 
 	= $cookies{'minimum_start_elevation'}->value;
 }
 if (not defined $minimum_start_elevation) {
-    $minimum_start_elevation = ' ';
+    $minimum_start_elevation = '30';
 }
 
 if (defined $cookies{'minimum_end_elevation'}) {
@@ -163,7 +156,7 @@ if (defined $cookies{'minimum_end_elevation'}) {
 	= $cookies{'minimum_end_elevation'}->value;
 }
 if (not defined $minimum_end_elevation) {
-    $minimum_end_elevation = ' ';
+    $minimum_end_elevation = '30';
 }
 
 if (defined $cookies{'minimum_ha'}) {
@@ -983,16 +976,27 @@ part of the transit must be at night), and which parts of an event are
 <INPUT TYPE="submit" VALUE="Submit">
 </FORM></p>
 
+<p><hr/></p>
+
+<p> If this tool is useful for your research, please consider citing it, e.g. 
+<a href="https://ui.adsabs.harvard.edu/abs/2013ascl.soft06007J/abstract"> 
+Jensen E. L. N. 2013. <i>Tapir: A Web Interface for Transit/Eclipse
+    Observability</i>, Astrophysics Source Code Library ascl:1306.007</a>.
+</p>
+
 <p>
 This page uses input ephemeris data from the <a
 href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet
     Archive</a> and <a
-    href="https://exofop.ipac.caltech.edu/tess/">ExoFOP-TESS</a>.
+    href="https://exofop.ipac.caltech.edu/tess/">ExoFOP-TESS</a>. 
+The finding charts provided here make use of images from the Digitized Sky
+Survey, which are subject to <a
+href="http://archive.stsci.edu/dss/copyright.html">copyright</a>, and can be acknowledged <a
+href="http://archive.stsci.edu/dss/acknowledging.html">like this</a>. 
 </p>
 
 <p>
-This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+ This
 tool is part of <a
 href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
 package</a> for planning astronomical observations; the <a
@@ -1001,6 +1005,8 @@ freely available.
 </p>
 
 <p>
+This page was created by <a
+href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>. 
 Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
 >here</a>.

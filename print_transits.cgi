@@ -2515,7 +2515,7 @@ sub observable_time {
 	my $message = "Error with elevation calculation in sub observable_time" .
 	    ". Elevation is $el at time $time. (HA $ha, start time" . 
 	    " $args->{'start_time'} Inc $inc_string search start $search_start  \n";
-	$message .= "Baseline $args->{'max_baseline'}.\n"; 
+	$message .= "Baseline $args->{'max_baseline'} Min elevation $args->{'minimum_elevation'}.\n"; 
 	if (defined($args->{'name'})) {
 	    $message .= "Target $args->{'name'}\n";
 	}
