@@ -922,16 +922,6 @@ Only show targets with names matching this string: <INPUT
 <INPUT TYPE="submit" VALUE="Submit">
 </p>
 
-
-<p>
-Show the input ephemeris data used to generate the target list (useful
-for debugging if a particular target isn\'t showing up as you
-expect):<br />
-<INPUT TYPE="radio" NAME="show_ephemeris" VALUE="0" Checked/> No <br />
-<INPUT TYPE="radio" NAME="show_ephemeris" VALUE="1"/> Yes <br />
-</p>
-
-
 <h3>Output format and labeling:</h3>
 <p>
 Output results as: <br />
