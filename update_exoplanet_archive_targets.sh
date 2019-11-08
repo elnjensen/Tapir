@@ -26,7 +26,10 @@ curl --silent --fail 'https://exoplanetarchive.ipac.caltech.edu/cgi-bin/nstedAPI
 # If non-zero size and different from the old file, replace the old file: 
 if [ -s $NEW_FILE ] && ! cmp --silent $TARG_FILE $NEW_FILE
 then
-    # Files are different; replace: 
+    # Files are different:
+    # Echo differences; comment out next line if you want silent output:
+    diff $TARG_FILE $NEW_FILE
+    # Replace the old file: 
     mv $NEW_FILE $TARG_FILE
     chmod o+r $TARG_FILE 
     # Also download the supplemental information from the other table: 
