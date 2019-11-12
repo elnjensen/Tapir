@@ -527,6 +527,12 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
+           "Union College Observatory, NY" => {
+	       latitude => 42.8176,
+	       longitude => -73.9283,
+	       timezone => 'EST5EDT',
+           },
+
 	   "Van Vleck Observatory, Wesleyan University, CT" => {
 	       latitude => 41.555000,
 	       longitude => -72.659167,
