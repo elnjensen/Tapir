@@ -43,6 +43,11 @@ foreach my $a (@$csv_lines) {
 
 
     $a->{comments} = $a->{"Comments"};
+    $a->{comments} .= " (updated " . 
+	$a->{"Date Modified"} . ")";
+    # Remove the HH:MM:SS, just keep the date: 
+    $a->{comments} =~ s/ ?\d\d:\d\d:\d\d//;
+
     # Make the name from both the TIC ID and trailing part of the TOI: 
     my $toi_suffix;
     if ( $a->{"TOI"} =~ m/^\d+(\.\d{1,2})$/) {
