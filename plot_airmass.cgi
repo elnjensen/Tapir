@@ -4,7 +4,7 @@
 # target.  Input parameters are provided by airmass.cgi, which calls
 # this script. 
 
-# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -203,8 +203,8 @@ if (($ra eq '') and ($target_input ne '')) {
 
 	# Try to match a pattern in the output to get coords:
 	if ($simbad_output 
-	    !~ m%<jpos>\s*(\d\d:\d\d:\d\d\.?\d*)\s+
-	               ([+-]?\d\d:\d\d:\d\d\.?\d*)\s*</jpos>%x) { 
+	    !~ m%<jpos>\s*(\d\d:\d\d[:.\d]*)\s+
+                    ([+-]?\d\d:\d\d[:.\d]*)\s*</jpos>%x) { 
 	    my $err_title =  "Error - no coordinates";
 	    my $err_message = "No RA given and could not parse/resolve"
 		. " name: $target_input \n"
