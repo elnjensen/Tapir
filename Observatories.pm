@@ -213,6 +213,13 @@ our %observatories_western_north_america = (
 	       timezone => 'MST7MDT',
 	   },
 
+	   "Boyce-Astro Research Observatory (San Diego)" => {
+	       latitude => 32.6133,
+	       longitude => -116.3319,
+	       timezone => 'America/Los_Angeles',
+	   },
+
+
 					   );
 
 
