@@ -129,7 +129,7 @@ and line3 are the lines the show the sunset and sunrise times.
   fill: #dddddd;
 }
 
-.dataPointLabel1_inverted{
+.dataPointLabel1_inverted,.dataPointLabel2_inverted{
   fill: #333333;
 }
 
@@ -186,6 +186,7 @@ and line3 are the lines the show the sunset and sunrise times.
     fill: none;
     stroke: Purple;
     stroke-width: 1px;
+    stroke-dasharray: 2 4;
   }
 
   .key2,.fill2{

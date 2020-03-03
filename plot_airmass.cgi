@@ -715,7 +715,7 @@ if ( ($jd_start ne "") and ($jd_end ne "") ) {
 if ($invert) {
     $svg =~ s/class=([\"\'])
 	              (line[123] |
-		       dataPointLabel1 |
+		       dataPointLabel[12] |
 		       transitRectMouseIn |
 		       transitLabel)/
 		       class=${1}${2}_inverted/gx;
