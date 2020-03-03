@@ -36,6 +36,7 @@
 
 use Astro::Coords;
 use Astro::Telescope;
+use Astro::PAL;
 use DateTime::Format::Epoch::JD;
 use DateTime::Format::RFC3339;
 use SVG::TT::Graph::TimeSeries;
@@ -115,6 +116,12 @@ if ($use_utc) {
 my $invert = $q->param("invert");
 if ((not defined $invert) or ($invert eq "")) {
     $invert = 0;
+}
+
+# Check to see if they set the parameter to plot Moon position:
+my $plot_moon = $q->param("plot_moon");
+if ((not defined $plot_moon) or ($plot_moon eq "")) {
+    $plot_moon = 0;
 }
 
 # Check to see if they set the parameter to change airmass scale:
@@ -231,6 +238,7 @@ if (($ra eq '') and ($target_input ne '')) {
 }
 
 my $sun = new Astro::Coords(planet => "sun");
+my $moon = new Astro::Coords(planet => "moon");
 
 # If the coords are in decimal form, and are less than 2 pi, then 
 # they get interpreted by Astro::Coords as radians (which surely
@@ -258,7 +266,7 @@ my $target = new Astro::Coords( ra => $ra,
 				units => $coord_format,
 				);
 
-if ((not defined($target)) or ($original_ra >= 24)) {
+if ((not defined($target)) or (($coord_format eq 'degrees') and ($original_ra >= 24))) {
     my $err_title = "Could not parse coordinates";
     my $err_message = "Could not parse the coordinates RA = [$original_ra]" 
 	. " and/or Dec = [$dec].<br />  Note: square brackets are not part"
@@ -281,6 +289,7 @@ my $telescope = new Astro::Telescope(Name => "My observatory",
 
 $sun->telescope($telescope);
 $target->telescope($telescope);
+$moon->telescope($telescope);
 
 # Now set the time for which we'll do the calculation; if the user
 # passed in a Julian Date (JD), use it; otherwise use the mm-dd-yyyy
@@ -401,11 +410,90 @@ my $gradient_def = <<END_GRADIENT;
 END_GRADIENT
     ;
 
+
+my @data = ();
+my @moon_data = ();
+my ($ra_target, $dec_target) = $target->radec;
+
+# Create an object we will use to reformat the datetime values into a
+# format that the plotting routine will parse correctly, including an
+# embedded timezone: 
+
+my $formatter = DateTime::Format::RFC3339->new();
+
+# Track minimum airmass, and record moon info at that point:
+my $airmass_min = 1000;
+my ($moon_pct, $moon_dist);
+
+my $time = $start->clone();
+$time->set_time_zone('UTC');
+
+while ($time <= $end) {
+    $target->datetime($time);
+
+    my $airmass = $target->airmass();
+
+    # Change timezone as needed for labeling: 
+    $time->set_time_zone($timezone);
+    # Create a mouseover label for the datapoint:
+    my $time_label =  $time->hms();
+    # Strip the seconds:
+    $time_label =~ s/:\d\d$//;
+    # Strip a leading zero if present:
+    $time_label =~ s/^0//;
+    my $label = sprintf("%s, %0.2f",  $time_label, $airmass);
+    my $datestring = $formatter->format_datetime($time);
+    push @data, [$datestring, $airmass, $label];
+
+    # Do the same thing for the Moon as well: 
+    $moon->datetime($time);
+    $sun->datetime($time);
+    my $moon_airmass = $moon->airmass();
+    my ($ra_moon, $dec_moon) = $moon->radec; 
+    my ($ra_sun, $dec_sun) = $sun->radec; 
+
+
+    # Moon illumination formula from Meeus, "Astronomical Algorithms".
+    # Formulae 46.1 and 46.2 in the 1991 edition, using the
+    # approximation cos(psi) \approx -cos(i).  Error should be no more
+    # than 0.0014 (p. 316).
+
+    my $moon_illum =  0.5 * (1. - sin($dec_sun)*sin($dec_moon) -
+			     cos($dec_sun)*cos($dec_moon)*
+			     cos($ra_sun - $ra_moon)) * 100;
+
+    my $moon_distance_deg = Astro::PAL::palDsep($ra_moon,
+						$dec_moon, 
+						$ra_target,
+						$dec_target) *
+						    Astro::PAL::DR2D; 
+
+    $label = sprintf("Moon %0.0f%% @ %0.0f&deg;",  $moon_illum,
+		     $moon_distance_deg);
+    push @moon_data, [$datestring, $moon_airmass, $label];
+
+    # See if we want to save moon info: 
+    if ($airmass <= $airmass_min) {
+	$airmass_min = $airmass;
+	$moon_pct = $moon_illum;
+	$moon_dist = $moon_distance_deg;
+    }
+
+    # Time arithmetic is always safest in UTC: 
+    $time->set_time_zone('UTC');
+    $time->add( minutes=>5 );
+}
+
+# Create the graph, and start adding data: 
+
 # Title to print
 my $title = "Airmass plot";
 if ($target_input ne '') {
-    $title .= " for $target_input";
+    $title .= " for $target_input;";
 }
+
+$title .=  sprintf(" Moon %0.0f%% @ %0.0f&deg;", $moon_pct, $moon_dist);
+
 my $subtitle = "RA = $original_ra, Dec = $dec\; $observatory_name "
     . "Lat, long = $observatory_latitude, $observatory_longitude";
 
@@ -446,40 +534,22 @@ my $graph = SVG::TT::Graph::TimeSeries->new({
 
     'tidy'                => 0,
     'key'                 => 0,
+    'key_position'        => 'bottom',
     'style_sheet'         => $stylesheet,
 });
 
 
 
-my $time = $start->clone();
-
-my @data = ();
-
-# Create an object we will use to reformat the datetime values into a
-# format that the plotting routine will parse correctly, including an
-# embedded timezone: 
-
-my $formatter = DateTime::Format::RFC3339->new();
-
-while ($time <= $end) {
-    $target->datetime($time);
-    my $airmass = $target->airmass();
-    $time->set_time_zone($timezone);
-    # Create a mouseover label for the datapoint:
-    my $time_label =  $time->hms();
-    # Strip the seconds:
-    $time_label =~ s/:\d\d$//;
-    # Strip a leading zero if present:
-    $time_label =~ s/^0//;
-    my $label = sprintf("%s, %0.2f",  $time_label, $airmass);
-    my $datestring = $formatter->format_datetime($time);
-    push @data, [$datestring, $airmass, $label];
-    $time->set_time_zone('UTC');
-    $time->add( minutes=>5 );
-}
 
 $graph->add_data(
 		 { data => \@data,
+		   title => "$target_input",
+	       }
+		 );
+
+$graph->add_data(
+		 { data => \@moon_data,
+		   title => 'Moon',
 	       }
 		 );
 

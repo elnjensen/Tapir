@@ -93,6 +93,14 @@ and line3 are the lines the show the sunset and sunrise times.
   font-weight: normal;
 }
 
+.yAxisLabels_right{
+  text-anchor: end;
+  fill: #000000;
+  font-size: 12px;
+  font-family: "Arial", sans-serif;
+  font-weight: normal;
+}
+
 .xAxisTitle{
   text-anchor: middle;
   fill: #555555;
@@ -123,6 +131,10 @@ and line3 are the lines the show the sunset and sunrise times.
 
 .dataPointLabel1_inverted{
   fill: #333333;
+}
+
+.dataPointLabel2{
+  fill: #dddddd;
 }
 
 .staggerGuideLine{
@@ -165,8 +177,9 @@ and line3 are the lines the show the sunset and sunrise times.
 
   .line2{
     fill: none;
-    stroke: #7D0541;
+    stroke: orange;
     stroke-width: 1px;
+    stroke-dasharray: 2 4;
   }
 
   .line2_inverted{
@@ -176,37 +189,37 @@ and line3 are the lines the show the sunset and sunrise times.
   }
 
   .key2,.fill2{
-    fill: #7D0541;
+    fill: orange;
     stroke: none;
-    stroke-width: 1px;
+    stroke-width: 4px;
   }
 
                
-  .fill3{
+  .fill3,.fill4{
     fill: #7D0541;
     fill-opacity: 0.2;
     stroke: none;
   }
 
-  .line3{
+  .line3,.line4{
     fill: none;
     stroke: #7D0541;
     stroke-width: 1px;
   }
 
-  .line3_inverted{
+  .line3_inverted,.line4_inverted{
     fill: none;
     stroke: Purple;
     stroke-width: 1px;
   }
 
-  .key3,.fill3{
+  .key3,.fill3,.key4,.fill4{
     fill: #7D0541;
     stroke: none;
     stroke-width: 1px;
   }
 
-               
+/*               
   .fill4{
     fill: #00AB66;
     fill-opacity: 0.2;
@@ -225,22 +238,22 @@ and line3 are the lines the show the sunset and sunrise times.
     stroke: none;
     stroke-width: 1px;
   }
-
+*/
                
-  .fill5{
+  .fill5,.fill6{
     fill: #00AB66;
     fill-opacity: 0.2;
     stroke: none;
   }
 
-  .line5{
+  .line5,.line6{
     fill: none;
     stroke: #00AB66;
     stroke-width: 1.5px;
     stroke-dasharray: 8 2;
   }
 
-  .key5,.fill5{
+  .key5,.fill5,.key6,.fill6{
     fill: #00AB66;
     stroke: none;
     stroke-width: 1px;
