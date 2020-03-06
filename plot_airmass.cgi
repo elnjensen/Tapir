@@ -721,6 +721,13 @@ if ($invert) {
 		       class=${1}${2}_inverted/gx;
 }
 
+my $moon_factor = 1.5*(1 + $moon_pct/100);
+my $style = sprintf('style="stroke-width:%0.1fpx;stroke-dasharray:%0.1f %0.1f"',
+		    $moon_factor, $moon_factor, 8-$moon_factor);
+# Update line 2 style (Moon) with thickness reflecting phase:
+$svg =~ s/(class=[\"\'] line2(_inverted)? [\"\'])/
+		       ${1}$style/gx;
+
 if ($elevation_labels) {
     # Get all matches to the left-hand axis labels (generated
     # automatically by SVG TT Graph) and use them to create corresponding
