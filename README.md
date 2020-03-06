@@ -212,6 +212,10 @@ This code is free software, and it is released under the terms of the
 GNU General Public License.  See the file COPYING.txt for more
 details. 
 
+## Citing: 
+
+If you find this code useful for your work, please consider citing the
+Astronomy Source Code Library entry, https://ui.adsabs.harvard.edu/abs/2013ascl.soft06007J .
 
 ## Acknowledgments:
 
