@@ -7,7 +7,7 @@
 # provided by transits.cgi, which calls this script. 
 
 
-# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -61,10 +61,6 @@ use warnings;
 # Cause fatal errors to print to browser rather than (in addition to?)
 # webserver log file:
 use CGI::Carp qw(fatalsToBrowser);
-
-# Our target file is encoded as UTF-8, so make sure everything we
-# write to the browser is encoded in the same way: 
-binmode(STDOUT, ":utf8");
 
 
 ############# Variables for local configuration ##############

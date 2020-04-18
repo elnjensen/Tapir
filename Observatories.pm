@@ -1,6 +1,6 @@
 package Observatories;
 
-# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -171,7 +171,6 @@ our %observatories_western_north_america = (
 	   },
 
 
-
 	   "McDonald Observatory" => {
 	       latitude => 30.671667,
 	       longitude => -104.021667,
@@ -316,9 +315,9 @@ our %observatories_europe = (
 	       timezone => 'Europe/Madrid',
 	   },
 
-	   "Observatorium Hoher List (Universitaet Bonn) - Germany" => {
+	   "Observatorium Hoher List (Universität Bonn) - Germany" => {
 	       latitude => 50.162760,
-	       longitude => -6.850000,
+	       longitude => 6.850000,
 	       timezone_integer => -1,
 	       timezone => 'Europe/Berlin',
 	   },
