@@ -29,6 +29,20 @@
 # <http://www.gnu.org/licenses/>.
 
 
+# These next settings are turned on to have the strictest possible
+# error checking and warnings, to help find obscure bugs.  If they are
+# causing problems, any of them can be commented out.
+
+# Require declaration of all variables:
+use strict;
+# Warn about suspect constructions, uninitalized variables, etc.
+# Equivalent to the -w command-line switch.
+use warnings;
+# Cause fatal errors to print to browser rather than (in addition to?)
+# webserver log file:
+use CGI::Carp qw(fatalsToBrowser);
+
+
 use Astro::Coords;
 use Astro::Telescope;
 
@@ -48,20 +62,6 @@ use Switch;
 use Encode;
 use List::Util qw (min max); 
 use Text::CSV qw( csv );
-
-# These next settings are turned on to have the strictest possible
-# error checking and warnings, to help find obscure bugs.  If they are
-# causing problems, any of them can be commented out.
-
-# Require declaration of all variables:
-use strict;
-# Warn about suspect constructions, uninitalized variables, etc.
-# Equivalent to the -w command-line switch.
-use warnings;
-# Cause fatal errors to print to browser rather than (in addition to?)
-# webserver log file:
-use CGI::Carp qw(fatalsToBrowser);
-
 
 ############# Variables for local configuration ##############
 
@@ -334,10 +334,12 @@ switch ($twilight) {
 	       $twilight_label = "Nautical twilight"; }
     case -18  {$twilight_rad = Astro::Coords::AST_TWILIGHT;
 	       $twilight_label = "Astronomical twilight"; }
-    # Default to nautical if any other value given:
-    else      {$twilight_rad = Astro::Coords::NAUT_TWILIGHT;
-	       $twilight_label = "Nautical twilight"; }
-}
+    # Interpret other values as elevation in degrees:
+    else      {$twilight_rad = Astro::PAL::DD2R * $twilight;
+	       $twilight_label = sprintf("Sun elev. %0.1f&deg;", $twilight); 
+	       # Make the minus sign look a little nicer:
+	       $twilight_label =~ s/-(\d)/&ndash;$1/; }
+    }
 
 # Whether the output will be printed as an HTML table; if this
 # parameter is not set, then the output is printed in a
@@ -623,22 +625,48 @@ while ($current_date <= $end_date) {
   # sets we are building up:
   my $next_sunset = $sun->set_time(horizon => $twilight_rad);
   my $next_sunrise = $sun->rise_time(horizon => $twilight_rad);
-  $sunsets = $sunsets->union( $next_sunset ); 
-  $sunrises = $sunrises->union( $next_sunrise ); 
 
+  # If the Sun doesn't rise or doesn't set on that day (e.g. at polar
+  # latitudes) then the above might be undefined and we can't merge it
+  # with the rest of the set: 
+
+  if (not defined $next_sunset) {
+      # Check to see if this is because Sun is always down:
+      if ($sun->el(format => 'rad') < $twilight_rad) {
+	  # Dark so we can observe; take the meridian crossing as the
+	  # delimeter of the night, rather than sunrise/sunset: 
+	  $sunsets = $sunsets->union( $sun->meridian_time() ); 
+      }
+  } else {
+      $sunsets = $sunsets->union( $next_sunset ); 
+  }
+
+  if (not defined $next_sunrise) {
+      # Check to see if this is because Sun is always down:
+      if ($sun->el(format => 'rad') < $twilight_rad) {
+	  # Dark so we can observe; take the meridian crossing as the
+	  # delimeter of the night, rather than sunrise/sunset: 
+	  $sunrises = $sunrises->union( $sun->meridian_time() ); 
+      }
+  } else {
+      $sunrises = $sunrises->union( $next_sunrise ); 
+  }
+  
 
   # Increment by a day and go back to the beginning of the loop.
-  # Actually, since the time of sunset and sunrise shift a little
-  # bit day to day, if we increment by a day, and if we happen to be
-  # doing this exactly at sunset or sunrise, we could miss an event
-  # (e.g., the next sunrise could come 23h59m later and we increment
-  # by 24h).  To be on the safe side, increment by a little less
-  # than 24 hours.  If we end up calculating some duplicate times 
-  # (which we will eventually if we have a long enough span) it
-  # doesn't really matter, since DateTime::Set recognizes duplicate
-  # values and doesn't actually add another one to the set.
+  # Actually, since the time of sunset and sunrise shift a little bit
+  # day to day, if we increment by a day, and if we happen to be doing
+  # this exactly at sunset or sunrise, we could miss an event (e.g.,
+  # the next sunrise could come 23h59m later and we increment by 24h).
+  # To be on the safe side, increment by less than 24 hours. The edge
+  # case near the poles is that the first/last days with sunlight can
+  # differ by up to an hour in day length from the previous day. If we
+  # end up calculating some duplicate times (which we will eventually
+  # if we have a long enough span) it doesn't really matter, since
+  # DateTime::Set recognizes duplicate values and doesn't actually add
+  # another one to the set.
 
-  $current_date->add( hours => 23, minutes => 30 );
+  $current_date->add( hours => 23, minutes => 0 );
 }
 
 
@@ -660,6 +688,7 @@ if (not $print_html) {
       # where the cookies actually are returned the user's browser and set.
       print $q->header(-type => "text/html",
 		       -charset => "UTF-8",
+		       -Cache_Control => "no-cache",
 		       -cookie => [$latitude_cookie, 
 				   $longitude_cookie, 
 				   $utc_cookie,
@@ -754,7 +783,13 @@ my $rec_separator = ',.';
 # read target lines from the specified target file:
 
 my @lines = ();
-if ($single_object==1) {
+my $no_twilight = 0;
+
+if ($sunrises->is_empty_set() and $sunsets->is_empty_set()) {
+    # No darkness; just leave target list empty;
+    # Set a flag so we know why there are no entries:
+    $no_twilight = 1;
+} elsif ($single_object == 1) {
     # They have checked the radio button that specifies manual entry
     # of the ephemeris for a single object, so get the entered
     # info. Put these into a hash, since that's what would be returned
@@ -1174,6 +1209,7 @@ if ($print_html) {
 		     max_airmass => $max_airmass,
 		     reached_max_eclipses => $reached_max_eclipses,
 		     tess => $tess,
+		     no_twilight => $no_twilight,
 		    );
   print $template->output();
 
@@ -1352,12 +1388,13 @@ sub get_eclipses {
   # Just so we don't loop forever (e.g. if a huge number of days in
   # the future was specified), we set some maximum number of
   # eclipses we'll check:
-  my $eclipse_iteration = 0;
+  my $eclipse_iteration = -1;
   my $max_eclipses_to_try = 2000;
 
 
  ECLIPSE_LOOP:
   while ($eclipse_iteration < $max_eclipses_to_try) {
+    $eclipse_iteration++;
     # Calculate JD of next eclipse:
     my $eclipse_jd = $new_epoch + $period*$eclipse_iteration + $offset;
 
@@ -1371,7 +1408,6 @@ sub get_eclipses {
     # just increment to next eclipse and jump back to the start of
     # the loop:
     if ( $eclipse_jd <= ($thisjd - $days_in_past) ) {
-      $eclipse_iteration++;
       next ECLIPSE_LOOP;
     }
 
@@ -1408,7 +1444,6 @@ sub get_eclipses {
     # Short-circuit our loop if this doesn't pass the cut: 
     if ( ($el_start_deg < $minimum_start_elevation) 
 	 and ($and_vs_or eq 'and') and (not $observing_from_space)) {
-	$eclipse_iteration++;
 	next ECLIPSE_LOOP;
     }
 
@@ -1419,13 +1454,11 @@ sub get_eclipses {
     if (      ($el_end_deg < $minimum_end_elevation) 
 	 and  ($el_start_deg < $minimum_start_elevation) 
 	 and (not $observing_from_space)) {
-	$eclipse_iteration++;
 	next ECLIPSE_LOOP;
     } elsif (( ($el_end_deg < $minimum_end_elevation) 
 	 or    ($el_start_deg < $minimum_start_elevation) )
 	and ($and_vs_or eq 'and')
         and (not $observing_from_space)) {
-	$eclipse_iteration++;
 	next ECLIPSE_LOOP;
     }
 
@@ -1498,7 +1531,6 @@ sub get_eclipses {
 
 
 	unless (($is_observable) or ($observing_from_space)) {
-	     $eclipse_iteration++;
 	     next ECLIPSE_LOOP;
 	}
 
@@ -1887,16 +1919,10 @@ sub get_eclipses {
 	my $local_date = $dt->ymd;
 
 
-	# Now find times of the start and end of eclipse:
-	my $eclipse_full_width_hours = int($eclipse_width);
-	my $eclipse_full_width_minutes 
-	  = int(60.* ($eclipse_width -
-		      $eclipse_full_width_hours));
 	# String for printing the duration:
-	my $eclipse_duration_string
-	  = sprintf("%d:%02d",
-		    $eclipse_full_width_hours, 
-		    $eclipse_full_width_minutes);
+	my $eclipse_duration_string = hours_to_hm($eclipse_width);
+
+	# Now find times of the start and end of eclipse:
 	# DateTime objects for start and end:
 	my $dt_start_local = $dt - $eclipse_half_duration;
 	my $dt_end_local = $dt + $eclipse_half_duration;
@@ -2067,7 +2093,6 @@ sub get_eclipses {
 
         $eclipse{csv_text} = eclipse_csv_entry(\%eclipse);
 
-
 	push(@local_eclipse_times, $eclipse_jd);
 	push(@local_eclipse_info, \%eclipse);
 
@@ -2075,7 +2100,6 @@ sub get_eclipses {
 
       } # End block for eclipse being visible
     } # End of block for eclipse being at night
-    $eclipse_iteration++;
   } # End of while block ECLIPSE_LOOP
 
   return \@local_eclipse_times, \@local_eclipse_info;
@@ -2291,6 +2315,7 @@ sub target_info_page {
 	$target_page_url = "https://exoplanetarchive.ipac.caltech.edu/cgi-bin/DisplayOverview/nph-DisplayOverview?objname=$name";
 	$target_page_label = "Exoplanet Archive";
     }
+    
 
     return $target_page_url, $target_page_label;
 }
@@ -2311,7 +2336,7 @@ sub finding_chart_page {
     # Use the target name to construct the URL of the page
     # with the finding chart.  If we are running the script
     # with just a single object as input, presumably we
-    # don't already have a finding chart for it, so 
+    # do not already have a finding chart for it, so 
     # we create a custom link to generate one on the fly:
 
     my $chart_url;
@@ -2359,6 +2384,16 @@ sub hours_to_duration {
 
     return $new_duration;
 
+}
+
+sub hours_to_hm {
+
+# Takes a decimal number of hours and returns a string of the form
+# h:mm or hh:mm. Using a floating point format for minutes means
+# that minutes are rounded rather than truncated.
+
+    my $hrs = shift;
+    return sprintf("%d:%02.0f", int($hrs), 60*($hrs - int($hrs)));
 }
 
 sub observable_time {
@@ -2440,6 +2475,10 @@ sub observable_time {
     $sun->datetime($time);
 
     if ( $sun->el(format=>'rad') > $args->{'twilight_rad'} ) {
+	# Note: these could fail if the search location is at polar
+	# latitudes and always-daylight times haven't been filtered
+	# out above.  For always-night times of year, we never get
+	# into this block. 
 	if ($sign == 1){
 	    # Next sunset: 
 	    $time = $sun->set_time( horizon => $args->{'twilight_rad'});

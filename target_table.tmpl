@@ -698,7 +698,12 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
 </table>
 
 <TMPL_ELSE>
-<h3>  No events found that match your search criteria. </h3>
+<h3>  No events found that match your search criteria.</h3>
+  <TMPL_IF EXPR="no_twilight > 0">
+    <h3> In the date range searched, the Sun never set below your
+    specified twilight elevation
+    of <TMPL_VAR NAME="twilight">&deg;.</h3>
+  </TMPL_IF>
 </TMPL_IF>
 
 <TMPL_IF EXPR="non_eclipse_target_count > 0">
