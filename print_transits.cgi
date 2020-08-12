@@ -676,7 +676,7 @@ my $print_calendar;
 
 if (not $print_html) {
   $print_calendar = 1;
-  print $q->header(-type =>"text/plain",
+  print $q->header(-type =>"text/csv",
 		   -charset => "UTF-8");
   my $header_text = "Subject,Start Date,Start Time,End Date," .
     "End Time,All Day Event,Description\n";
@@ -713,7 +713,7 @@ if (not $print_html) {
 			    );
   } else {
       # Print raw CSV (not for calendar):
-      print $q->header(-type =>"text/plain",
+      print $q->header(-type =>"text/csv",
 		       -charset => "UTF-8");
   }
 }  # End printing headers.
