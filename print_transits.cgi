@@ -673,7 +673,7 @@ while ($current_date <= $end_date) {
 # the HTML page:
 my $print_calendar;
 
-if (not $print_html) {
+if ($print_html == 0) {
   $print_calendar = 1;
   print $q->header(-type =>"text/csv",
 		   -charset => "UTF-8",
@@ -1068,21 +1068,7 @@ my @sorted_eclipse_info = @eclipse_info[@sorted_eclipse_indices];
 # Now we can use those indices to print out the eclipse *strings* in
 # time order:
 
-if ($print_html) {
-  # Print the title text for the output page:
-  my $day_word;
-  if ($days_to_print <= 1) {
-    $day_word = "day";
-  } else {
-    $day_word = "days";
-  }
-
-  my $past_string;
-  if ($days_in_past > 0) {
-      $past_string = " and the past $days_in_past days";
-  } else {
-      $past_string = '';
-  }
+if ($print_html) {   # True for either 1 or 2
 
   if ($reached_max_eclipses) {
       my $max_message = "Not all potential targets were searched. "
@@ -1099,6 +1085,17 @@ if ($print_html) {
 
 
   if ($print_html == 1) {
+      # Print the title text for the output page:
+      my $day_word = 'days';
+      if ($days_to_print <= 1) {
+	  $day_word = "day";
+      }
+
+      my $past_string = '';
+      if ($days_in_past > 0) {
+	  $past_string = " and the past $days_in_past days";
+      }
+
       my $timezone_to_display = $use_utc ? 'UTC' : $observatory_timezone;
       print $q->h2("Upcoming events for the next $days_to_print $day_word"
 		   . " $past_string from $start_date_string;"
@@ -1494,6 +1491,8 @@ sub get_eclipses {
 	     next ECLIPSE_LOOP;
 	}
 
+	# Make up a hash with all the bits of info, to return:
+	my %eclipse;
 
 	# Passed other tests, now go ahead and get the mid-event
 	# elevation and daytime status: 
@@ -1670,20 +1669,21 @@ sub get_eclipses {
 	    format_datetime($obs_end_time);
 
 
-	# Get the fraction of the transit that is observable with the
-	# given constraints: 
-	my $transit_fraction;
+	# Get the amount and fraction of the transit that is
+	# observable with the given constraints:
+	my ($transit_fraction, $transit_observable_hrs);
 
 	if ($start_is_observable and $end_is_observable) {
 	    $transit_fraction = 100;
+            $transit_observable_hrs = $eclipse_width;
 	} elsif ($start_is_observable) {
-	    $transit_fraction = 100*($obs_end_time->
-				     subtract_datetime_absolute($dt_start)->seconds())/
-				     ($eclipse_width*3600);
+            $transit_observable_hrs = $obs_end_time->
+				     subtract_datetime_absolute($dt_start)->seconds()/3600.;
+	    $transit_fraction = 100*$transit_observable_hrs/$eclipse_width;
 	} else {
-	    $transit_fraction = 100*($dt_end->
-				     subtract_datetime_absolute($obs_start_time)->seconds())/
-				     ($eclipse_width*3600);
+	    $transit_observable_hrs = $dt_end->
+				     subtract_datetime_absolute($obs_start_time)->seconds()/3600;
+	    $transit_fraction = 100*$transit_observable_hrs/$eclipse_width;
 	}
 
 	if (not $use_utc) {
@@ -1695,16 +1695,20 @@ sub get_eclipses {
 	# observable.  We allocate 50% each to pre-ingress and
 	# post-egress baseline: 
 	my $baseline_fraction = 0;
+        # Amount of pre- and post-transit baseline observable, in hours:
+        my $baseline_pre_hrs = 0;
+        my $baseline_post_hrs = 0;
+
 	if ($obs_start_time <= $dt_start) {
-	    $baseline_fraction += 50*($dt_start->
-				     subtract_datetime_absolute($obs_start_time)->seconds())/
-				     ($desired_baseline*3600);
+            $baseline_pre_hrs = $dt_start->
+				     subtract_datetime_absolute($obs_start_time)->seconds()/3600.; 
+	    $baseline_fraction += 50*$baseline_pre_hrs/$desired_baseline;
 	}	    
 
 	if ($obs_end_time >= $dt_end) {
-	    $baseline_fraction += 50*($obs_end_time->
-				     subtract_datetime_absolute($dt_end)->seconds())/
-				     ($desired_baseline*3600);
+            $baseline_post_hrs = $obs_end_time->
+				     subtract_datetime_absolute($dt_end)->seconds()/3600.;
+	    $baseline_fraction += 50*$baseline_post_hrs/$desired_baseline;
 	}	    
 
 
@@ -1892,9 +1896,6 @@ sub get_eclipses {
 	my $local_time_end = $dt_end_local->hm;
 
 
-	# Make up a hash with all the bits of info, to return:
-	my %eclipse;
-
 	# Eclipse start and end were defined as DateTime objects
 	# above, but here we need them in JD:
 
@@ -1981,6 +1982,13 @@ sub get_eclipses {
 	$eclipse{depth} = $depth;
 	$eclipse{duration} = $eclipse_duration_string;
 	$eclipse{duration_hrs} = $eclipse_width;
+        if (defined($param_ref->{duration_uncertainty})) {
+	   $eclipse{duration_unc} = 
+               hours_to_hm($param_ref->{duration_uncertainty}); 
+	   $eclipse{duration_unc_hrs} =
+               $param_ref->{duration_uncertainty};
+        }
+	$eclipse{r_planet} = $r_planet;
 
         # Fill in all the variables related to baseline: 
 	$eclipse{baseline_hrs} = $show_unc ? 
@@ -2703,6 +2711,6 @@ sub transit_svg {
 	$path .= sprintf("M %0.0f %0.f %s", $mid*$H2P, $ydepth + $yzero, $hash);
     }
 
-    return $path . '"/>';;
+    return $path . '"/>';
     
 }
