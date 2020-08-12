@@ -2542,6 +2542,11 @@ sub DateTime::hm {
   my $dt = shift;
   my ($h,$m,$s) = split(/:/, $dt->hms()); 
   $m++ if ($s >= 30); 
+  # But if rounding up crosses an hour boundary, handle that:
+  if ($m == 60) {
+      $m = 0;
+      $h = ($h == 23) ? 0 : $h + 1;
+  }
   return sprintf("%02d:%02d", $h, $m);
 }
 
