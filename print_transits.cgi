@@ -45,6 +45,9 @@ use CGI::Carp qw(fatalsToBrowser);
 
 use Astro::Coords;
 use Astro::Telescope;
+# Constants for degrees to radians and vice versa, and angular
+# separation routine: 
+use Astro::PAL qw( DD2R DR2D palDsep );
 
 # Note - code at the end of this file adds a couple of new methods to
 # DateTime and DateTime::Duration that aren't in the core module. 
@@ -308,8 +311,6 @@ if ($single_object == 2) {
     $tess = 1;
 }
 
-
-
 # Whether to show the ephemeris data:
 my $show_ephemeris = $q->param("show_ephemeris");
 
@@ -335,7 +336,7 @@ switch ($twilight) {
     case -18  {$twilight_rad = Astro::Coords::AST_TWILIGHT;
 	       $twilight_label = "Astronomical twilight"; }
     # Interpret other values as elevation in degrees:
-    else      {$twilight_rad = Astro::PAL::DD2R * $twilight;
+    else      {$twilight_rad = DD2R * $twilight;
 	       $twilight_label = sprintf("Sun elev. %0.1f&deg;", $twilight); 
 	       # Make the minus sign look a little nicer:
 	       $twilight_label =~ s/-(\d)/&ndash;$1/; }
@@ -531,10 +532,9 @@ my $moon = new Astro::Coords(planet => "moon");
 # on input if we wanted to be even more precise about rise and set
 # times.
 
-my $deg2rad = Astro::PAL::DD2R;
 my $telescope = new Astro::Telescope(Name => "MyObservatory", 
-				  Long => $observatory_longitude*$deg2rad,
-				  Lat => $observatory_latitude*$deg2rad,
+				  Long => $observatory_longitude*DD2R,
+				  Lat => $observatory_latitude*DD2R,
 				  Alt => 0,
 				 );
 $sun->telescope($telescope);
@@ -1108,6 +1108,13 @@ if ($print_html) {
       my $label_lowercase = $twilight_label;
       $label_lowercase =~ tr/[A-Z]/[a-z]/;
       print $q->h3("Night starts/ends at $label_lowercase.");
+  } elsif ($print_html == 2) {
+      # The CSV standard says that double quotes embedded within a
+      # quoted field need to be doubled up so they aren't interpreted as
+      # the end of the field:
+      foreach my $t (@sorted_eclipse_info, @non_eclipse_info) {
+	  $t->{comments} =~ s/\"/\"\"/g;
+      }
   }
 
 
@@ -1752,11 +1759,8 @@ sub get_eclipses {
 				 cos($dec_sun)*cos($dec_moon)*
 				 cos($ra_sun - $ra_moon));
 
-	my $moon_distance_deg = Astro::PAL::palDsep($ra_moon,
-						    $dec_moon, 
-						    $ra_target,
-						    $dec_target) *
-							Astro::PAL::DR2D; 
+	my $moon_distance_deg = palDsep($ra_moon, $dec_moon, 
+					$ra_target, $dec_target) * DR2D; 
 
 
 	# Get the *local* date and day of week of the sunset
@@ -2388,10 +2392,6 @@ sub observable_time {
 
 # Inputs:  Hash ref 
 
-# pi/180:  degrees to radians; copied from Astro::PAL source.
-    use constant D2R => 0.017453292519943295769236907684886127134428718885417;
-
-
     my $DEBUG = 0; 
 
     my ($args) = @_; 
@@ -2477,11 +2477,11 @@ sub observable_time {
 	if ($sign == 1){
 	    # Next rise: 
 	    $time = $target->rise_time( horizon => 
-					D2R*$args->{'minimum_elevation'});
+					DD2R*$args->{'minimum_elevation'});
 	} else {
 	    # Previous set:
 	    $time = $target->set_time( horizon =>
-				       D2R*$args->{'minimum_elevation'}, 
+				       DD2R*$args->{'minimum_elevation'}, 
 				       event => -1);
 	}
 	$target->datetime($time);
