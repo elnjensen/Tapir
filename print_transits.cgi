@@ -1110,55 +1110,6 @@ if ($print_html) {
       print $q->h3("Night starts/ends at $label_lowercase.");
   }
 
-  # In order to let events on the same night have a leading column
-  # that spans multiple rows (i.e. to just list that night's date
-  # once), we need to loop through the whole array and tabulate how
-  # many events we have on each night.  We create a new entry in the
-  # data array, called "similar_count".  If a given event is the first
-  # one on that night, similar_count is given a value of the total
-  # number of events that night (so at least 1, but possibly more).
-  # If it is not the first that night, similar_count gets a value of
-  # zero.  So for example, for a night with three events, followed by
-  # a night with only one, the four entries for similar_count would
-  # be: [3 0 0 1].  We can then use this in the template to make one
-  # of the entries span three rows (the current plus the next two
-  # following rows).
-
-  # Remember that each entry of list @sorted_eclipse_info is itself a
-  # hash reference.
-
-  # Get the last index of our list:
-  my $last_index = $#sorted_eclipse_info;
-  # And start at the beginning of the list:
-  my $i=0;
-
-  my ($save_current_index, $current_count, $previous_string);
-  while ($i <= $last_index ) {
-    # First time through the loop we are always at the
-    # first of one or more similar entries:
-    $save_current_index = $i;
-    $current_count = 1;
-    # Save the date string we'll compare to in order to see if the
-    # following events are on the same date:
-    $previous_string = $sorted_eclipse_info[$i]->{sunset_local_datetime};
-    # Go to next element:
-    $i++;
-    # See if the following elements have the same date:
-    while ( ($i <= $last_index) and 
-	    ($sorted_eclipse_info[$i]->{sunset_local_datetime} eq 
-	     $previous_string) ) 
-      {
-	# Found a similar value, so increment our count:
-	$current_count++;
-	# Note that *this* item is not first of its sequence:
-	$sorted_eclipse_info[$i]->{similar_count} = 0;
-	$i++;
-      } # End of while loop over those similar to previous
-    # Have found all similar items, so record the count:
-    $sorted_eclipse_info[$save_current_index]->{similar_count} = 
-      $current_count;
-  } # End of while loop over all events
-
 
   # Get the count of how many non-eclipse "any time" targets we have,
   # since this may well be zero for some uses:
@@ -1224,7 +1175,8 @@ if ($print_html) {
       print $q->end_html;
   }
 
-} else {  # Matches "if $print_html" - if not, it's CSV output.
+} else {  # Matches "if $print_html" - if not, it's basic
+          # CSV calendar output with $print_html == 0.
   my $eclipse_entry;
   foreach $eclipse_entry (@sorted_eclipse_info) {
       print $eclipse_entry->{csv_text};
@@ -2065,9 +2017,6 @@ sub get_eclipses {
 				       $obs_end_time->ymd, 
 				       $obs_end_time->hm);
 
-	# Count to be filled in after sorting:
-	$eclipse{similar_count} = 0;
-        
         $eclipse{single_object} = $single_object;
         $eclipse{tess} = $tess;
         if ($tess) {
@@ -2500,7 +2449,7 @@ sub observable_time {
 	# out above.  For always-night times of year, we never get
 	# into this block. 
 	if ($sign == 1){
-	    # Next sunset: 
+	    # Next sunset:
 	    $time = $sun->set_time( horizon => $args->{'twilight_rad'});
 	} else {
 	    # Previous sunrise:
@@ -2588,9 +2537,12 @@ sub observable_time {
 sub DateTime::hm {
   # Just a simple shortcut for formatting ease, since the 
   # DateTime package doesn't provide a built-in method for 
-  # only hours and minutes: 
-  my $self = shift;
-  return $self->format_cldr("HH:mm");
+  # only hours and minutes.  This also rounds to the nearest minute,
+  # rather than truncating. 
+  my $dt = shift;
+  my ($h,$m,$s) = split(/:/, $dt->hms()); 
+  $m++ if ($s >= 30); 
+  return sprintf("%02d:%02d", $h, $m);
 }
 
 
@@ -2603,9 +2555,10 @@ sub DateTime::Duration::to_hrs {
 
     my $sign = $dur->is_negative() ? -1 : 1;
 
-    # These named method always return positive numbers, so multiply sum by the sign: 
-    return $sign * (($dur->weeks * 7 + $dur->days) * 24 + $dur->hours + $dur->minutes/60. +
-		    $dur->seconds/3600.);
+    # These named methods always return positive numbers, 
+    # so multiply sum by the sign: 
+    return $sign * (($dur->weeks * 7 + $dur->days) * 24 + $dur->hours
+		    + $dur->minutes/60. + $dur->seconds/3600.);
 
 }
 
