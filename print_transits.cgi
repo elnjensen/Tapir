@@ -677,9 +677,10 @@ my $print_calendar;
 if (not $print_html) {
   $print_calendar = 1;
   print $q->header(-type =>"text/csv",
-		   -charset => "UTF-8");
+		   -charset => "UTF-8",
+		   -attachment => "transits.csv");
   my $header_text = "Subject,Start Date,Start Time,End Date," .
-    "End Time,All Day Event,Description\n";
+    "End Time,All Day Event,Description\r\n";
   print $header_text;
 } else {  # HTML output
   $print_calendar = 0;
@@ -714,7 +715,8 @@ if (not $print_html) {
   } else {
       # Print raw CSV (not for calendar):
       print $q->header(-type =>"text/csv",
-		       -charset => "UTF-8");
+		       -charset => "UTF-8",
+		       -attachment => "transits.csv");
   }
 }  # End printing headers.
 
@@ -2265,14 +2267,32 @@ sub eclipse_csv_entry {
     $note .= " Elev. at start, mid, end: "
 	. "$t{start_el}, $t{mid_el}, $t{end_el}. ";
     chomp($t{comments});
-    $note .= "Notes: $t{comments}. "; 
-    if (defined $t{finding_chart}) {
-	$note .= "Finding chart at $t{finding_chart}. ";
+    if ($t{comments} !~ /^\s*$/) { # Comment not empty
+	$note .= "Notes: $t{comments}";
+	# Add a trailing period if not there already:
+	if ($note !~ /\s*\.\s*$/) {
+	    $note .= ". ";
+	}
     }
+    if (defined $t{finding_chart}) {
+	# To get the current path in order to make the finding chart
+	# URL absolute, we need the full URL, minus the script name
+	# itself:
+	my $url = CGI::url( -full => 1);
+	my $script = CGI::url( -relative => 1);
+	$url =~ s/$script$//;
+	$note .= "Finding chart at ${url}$t{finding_chart}.";
+    }
+
+    # The CSV standard says that double quotes embedded within a
+    # quoted field need to be doubled up so they aren't interpreted as
+    # the end of the field:
+    $note =~ s/\"/\"\"/g;
+
     # Add the note to the final entry.  It needs to be enclosed in
     # double quotes, or any embedded commas will be interpreted as
     # field separators:
-    $eclipse_entry .= '"' . $note . '"' . "\n";
+    $eclipse_entry .= '"' . $note . '"' . "\r\n";
 
     return $eclipse_entry;
     
