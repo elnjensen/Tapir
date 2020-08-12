@@ -262,7 +262,7 @@ if ((not defined $minimum_priority) or ($minimum_priority eq "")) {
   $minimum_priority = 0;
 }
 
-# Minimum depth (in millimags) to show; default to zero:
+# Minimum depth (in ppt) to show; default to zero:
 my $minimum_depth = $q->param("minimum_depth");
 if ((not defined $minimum_depth) or ($minimum_depth =~ /^\s*$/)) {
   $minimum_depth = 0;

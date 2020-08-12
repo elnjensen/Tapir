@@ -887,7 +887,8 @@ and <INPUT NAME="maximum_ha" VALUE="$maximum_ha" size="4"/> hours.  Constraints 
 
 <p>
 Only show transits with a depth of at least <INPUT
-    NAME="minimum_depth" VALUE="$minimum_depth" size="3"/> millimag. 
+    NAME="minimum_depth" VALUE="$minimum_depth" size="3"/> parts per
+    thousand (ppt).
 </p>
 
 </div>
