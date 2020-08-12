@@ -62,7 +62,6 @@ use CGI;
 use CGI::Cookie;
 use URI::Escape;
 use Switch;
-use Encode;
 use List::Util qw (min max); 
 use Text::CSV qw( csv );
 
