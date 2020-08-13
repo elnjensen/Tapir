@@ -1988,7 +1988,6 @@ sub get_eclipses {
 	   $eclipse{duration_unc_hrs} =
                $param_ref->{duration_uncertainty};
         }
-	$eclipse{r_planet} = $r_planet;
 
         # Fill in all the variables related to baseline: 
 	$eclipse{baseline_hrs} = $show_unc ? 
@@ -2288,7 +2287,6 @@ sub target_info_page {
 
     if (($target_ref->{tess}) and ($name =~ m/TIC (\d+)(\.\d+)? ?/)) {
 	# Then use back-references to those matches to make the URL:
-	my $TIC_ID = $1;
 	$target_page_url = "https://exofop.ipac.caltech.edu/tess/target.php?id=$1";
 	$target_page_label = "ExoFOP";
     } else {
