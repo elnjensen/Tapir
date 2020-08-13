@@ -320,6 +320,13 @@ if ((not defined $twilight) or ($twilight =~ /^\s*$/)) {
   $twilight = -12;
 }
 
+# Desired orbital phase to calculate and plot.  Zero is transit. 
+my $phase = $q->param("phase");
+if ((not defined $phase) or ($phase =~ /^\s*$/)) {
+  $phase = 0;
+}
+
+
 # Set up the value in radians of this angle (which is what the
 # calculations actually require, as well as a label to use for the
 # output:
@@ -720,15 +727,6 @@ if ($print_html == 0) {
 }  # End printing headers.
 
 
-# Some logic that would allow us to print secondary eclipses rather
-# than primary transits; currently our input form does not allow this
-# to be set, but could be changed here.  The logic to use it is
-# implemented below - it just adds half a period to every predicted
-# primary eclipse from the ephemeris.  Of course it's possible to
-# specify ephemerides directly in the input for the secondary eclipses
-# themselves.
-my $do_secondary_eclipses = 0;
-
 # Now, the main part of the code, for dealing with transits.  First,
 # we need to set up some variables we'll use.
 
@@ -740,7 +738,6 @@ my $do_secondary_eclipses = 0;
 my %constraints = (
 		   days_to_print=>$days_to_print,
 		   days_in_past=>$days_in_past,
-		   do_secondary_eclipses=>$do_secondary_eclipses,
 		   observatory_latitude => $observatory_latitude,
 		   observatory_longitude => $observatory_longitude,
 		   observatory_timezone => $observatory_timezone,
@@ -757,6 +754,8 @@ my %constraints = (
                    twilight_rad => $twilight_rad,
                    sun => $sun,
                    moon => $moon,
+                   baseline_hrs => $baseline_hrs,
+                   phase => $phase,
 		   );
 
 
@@ -1225,7 +1224,6 @@ sub get_eclipses {
   my $eclipse_width = $param_ref->{duration};
   my $days_to_print = $param_ref->{days_to_print};
   my $days_in_past = $param_ref->{days_in_past};
-  my $do_secondary_eclipses = $param_ref->{do_secondary_eclipses};
   my $observatory_timezone = $param_ref->{observatory_timezone};
   my $observing_from_space = $param_ref->{observing_from_space};
   my $comments = $param_ref->{comments};
@@ -1243,7 +1241,8 @@ sub get_eclipses {
   my $sun = $param_ref->{sun};
   my $moon = $param_ref->{moon};
   my $twilight_rad = $param_ref->{twilight_rad};
-
+  my $baseline_hrs = $param_ref->{baseline_hrs};
+  my $phase = $param_ref->{phase};
   my $tess = (defined $param_ref->{'disposition'}) ? 1 : 0;
 
   # Before we can calculate eclipse visibility, we need to set up
@@ -1290,15 +1289,10 @@ sub get_eclipses {
 
   my $new_epoch = $epoch + ($n_period_int * $period);
 
-  # If we're tracking secondary rather than primary eclipses, we
-  # just offset the epoch by half a period:
-  my $offset;
-  if ($do_secondary_eclipses) {
-    # Looking for secondary eclipses; add a half-period offset
-    $offset = $period * 0.5;
-  } else {
-    $offset = 0.;
-  }
+  # If we want to consider a phase other than the primary eclipse
+  # (which is at phase = 0), calculate the necessary offset in time:
+
+  my $offset = $period * $phase;
 
   # Now that we have determined our desired starting epoch, we
   # define various objects in Perl's DateTime framework; these will
