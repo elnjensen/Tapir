@@ -589,7 +589,7 @@ other target (or try an alternate ephemeris for a known target). </i>
 </tr>
 
 <tr>
-<td> JD (UTC) of mid-transit: &nbsp; </td>
+<td> BJD of mid-transit: &nbsp; </td>
 <td><input type="text" size="15"
     name="epoch"  style="text-align:center" /></td>
 </tr>
