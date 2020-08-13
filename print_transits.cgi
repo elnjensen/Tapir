@@ -1346,9 +1346,13 @@ sub get_eclipses {
  ECLIPSE_LOOP:
   while ($eclipse_iteration < $max_eclipses_to_try) {
     $eclipse_iteration++;
-    # Calculate JD of next eclipse:
-    my $eclipse_jd = $new_epoch + $period*$eclipse_iteration + $offset;
-
+    # Calculate JD of next eclipse, taking into account the shift from
+    # BJD at the solar system barycenter (where the ephemeris is
+    # specified) to the JD_UTC observed at Earth for this particular
+    # target: 
+    my $eclipse_bjd = $new_epoch + $period*$eclipse_iteration + $offset;
+    my $eclipse_jd = bjd2utcjd($eclipse_bjd, $ra_deg*DD2R,
+			       $dec_deg*DD2R); 
     # Have we gone past the specified time window yet?  If so, we
     # exit from the loop:
     if ($eclipse_jd > $thisjd + $days_to_print) {
@@ -1916,6 +1920,17 @@ sub get_eclipses {
 	$eclipse{jd_mid} = sprintf("%0.3f", $eclipse_jd
 				   - 2450000);
         
+        # Same thing, except for the BJD values.
+	$eclipse{bjd_start} = sprintf("%0.4f", $eclipse_bjd -
+                                      0.5 * $eclipse_width/24. - 2450000);
+
+	$eclipse{bjd_mid} = sprintf("%0.4f", $eclipse_bjd - 2450000);
+
+	$eclipse{bjd_end} = sprintf("%0.4f", $eclipse_bjd +
+                                    0.5 * $eclipse_width/24. - 2450000);
+
+
+
 	$eclipse{obs_end_jd} = sprintf("%0.3f", $obs_end_jd
 				   - 2450000);
         
@@ -2706,3 +2721,66 @@ sub transit_svg {
     return $path . '"/>';
     
 }
+
+sub bjd2utcjd {
+    # Given an input BJD time of an event at the solar system
+    # barycenter, arriving from sky direction RA, Dec, return a
+    # Julian Date specifying the UTC time that would be observed
+    # on Earth.  The time is corrected for: 
+    #
+    # Light travel time difference (Romer delay); and 
+    # Difference between UTC and TT, given by the constant offset of
+    #   32.184 seconds between TT and TAI, and the number of leap
+    #   seconds added, currently 37 as of August 2020;
+    # It does *not* correct for:
+    # - The position of the observer on Earth relative to the
+    #   geocenter (~20 ms)
+    # - the difference between BJD and TT, i.e. the Einstein delay
+    #   that is predominantly a sinusoid of ~3.4 ms 
+    # - Other effects at the ~ms level or less; see Eastman et
+    #   al. 2010 PASP 122:935,
+    #   https://ui.adsabs.harvard.edu/abs/2010PASP..122..935E
+    # For testing and other code, see also
+    # http://astroutils.astronomy.ohio-state.edu/time/ 
+    #
+    # Input RA and Dec are assumed to be in radians; returned value
+    # is a JD value corresponding to Earth-observed UTC. 
+
+    use Astro::PAL qw(palDtt palEpv);
+
+    # speed of light in AU/sec (from IAU AU and SI def. of c):
+    use constant C => 0.002003988804100003979;
+
+    my ($bjd, $ra, $dec) = @_;
+
+    # Get the x, y, z coordinates of the Earth, relative to the solar
+    # system barycenter.  These vector components are in an
+    # equatorially-based frame, and are in units of AU:
+
+    my ($helio_pos, $helio_vel, $bary_pos, $bary_vel) =
+	palEpv($bjd - 2400000.5);
+    my ($xbary, $ybary, $zbary) = @$bary_pos;
+
+    # Convert from the target's RA and Dec to the unit vector of its
+    # position in this x,y,z frame:
+    my $x = cos($dec) * cos($ra);
+    my $y = cos($dec) * sin($ra);
+    my $z = sin($dec);
+
+    # The dot product of these gives the projection of the
+    # Earth-barycenter vector in the direction of the target, so we
+    # can calculate the light-travel time difference.  A positive
+    # projection here means that the Earth is toward the same side of
+    # the barycenter as the target is, and so would see the signal
+    # earlier. Thus, this will represent an offset to be subtracted
+    # from the BJD.
+    my $r_proj = $x * $xbary + $y * $ybary + $z * $zbary;
+
+    # Get the light travel time difference, and also account for the
+    # offset between UTC and TT in seconds; palDtt gives TT - UTC:
+    my $delta_t = $r_proj/C + palDtt($bjd - 2400000.5);
+
+    # Offset returned value by both factors, in days:
+    return $bjd - $delta_t/86400;
+}
+
