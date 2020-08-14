@@ -1316,6 +1316,9 @@ sub get_eclipses {
 
   my $eclipse_half_duration =  hours_to_duration($eclipse_width/2.);
 
+  # We also want the above in units of days; 0.5*(hrs/24) = hrs/48
+  my $eclipse_half_dur_days = $eclipse_width/48;
+
   # Likewise for the out-of-transit baseline requested: 
 
   my $baseline_duration = hours_to_duration($baseline_hrs);
@@ -1353,18 +1356,44 @@ sub get_eclipses {
     my $eclipse_bjd = $new_epoch + $period*$eclipse_iteration + $offset;
     my $eclipse_jd = bjd2utcjd($eclipse_bjd, $ra_deg*DD2R,
 			       $dec_deg*DD2R); 
+
+    # For both of the endpoint comparisons, we extend by half the
+    # duration, in case the ingress or egress falls within our window
+    # even though the midpoint might not. By doing this, we are making
+    # sure the entire event (not just the midpoint) is outside the
+    # window of consideration.
+
+    my $ingress_jd = $eclipse_jd - $eclipse_half_dur_days;
+    my $egress_jd  = $eclipse_jd + $eclipse_half_dur_days;
+
+    # Flags for whether the ingress and egress fall within the
+    # requested time window.  Start out false, then check below.
+    my $ingress_in_window = 0;
+    my $egress_in_window = 0;
+ 
     # Have we gone past the specified time window yet?  If so, we
     # exit from the loop:
-    if ($eclipse_jd > $thisjd + $days_to_print) {
-      last ECLIPSE_LOOP;
+    if ($ingress_jd > ($thisjd + $days_to_print)) {
+	last ECLIPSE_LOOP;
+    } elsif ($ingress_jd >= ($thisjd - $days_in_past)) {
+	$ingress_in_window = 1;
     }
 
-    # Is the eclipse before our time window? If so,
+    # Is the eclipse completely before our time window? If so,
     # just increment to next eclipse and jump back to the start of
     # the loop:
-    if ( $eclipse_jd <= ($thisjd - $days_in_past) ) {
-      next ECLIPSE_LOOP;
+    if ( $egress_jd < ($thisjd - $days_in_past) ) {
+	next ECLIPSE_LOOP;
+    } elsif ($egress_jd <= ($thisjd + $days_to_print)) {
+	$egress_in_window = 1;
     }
+
+    # Note that there is an edge case here: for a long-duration
+    # transit, it's possible that neither the ingress nor egress will
+    # fall within our window, but the midpoint will.  We will treat
+    # this as observable if the "observing_from_space" option is set,
+    # but otherwise we will catch this below, where we require
+    # observability of ingress and/or egress.
 
     # Convert the eclipse midpoint from JD to a DateTime object.
     # There's a slight computational cost to doing this conversion
@@ -1419,8 +1448,8 @@ sub get_eclipses {
 
     # If this event passes further cuts below, eventually we will want
     # to know the mid-event elevation as well, but we defer
-    # calculating it, as well as hour angles and azimuths, until we're sure we need them. 
-
+    # calculating it, as well as hour angles and azimuths, until we're
+    # sure we need them.
 
     # Now we can check whether either the ingress or egress occurs at
     # night; to do this, we just find the elevation of the sun at
@@ -1445,18 +1474,21 @@ sub get_eclipses {
 
       # To be shown as an observable eclipse, we check both the start
       # and the end elevation, and also see whether the start and end
-      # are at night.  Whether the start and end constraints are ANDed
-      # or ORed depends on user input, so do and if-then for
-      # calculating the condtion.  We do require that these
-      # constraints be met *at night*.   To get around this, a user
-      # can specify the "space" observatory option, which shows all
-      # eclipses for a given target. 
+      # are at night.  We also cast a wider net above in terms of the
+      # times, but now we check to see if the start and end are
+      # actually within the time window the user requested. 
 
+      # Whether the start and end constraints are ANDed or ORed
+      # depends on user input, so take that literal "and" or "or"
+      # string and use 'eval' to apply it in a boolean test. If the
+      # user has requested the "space" observatory option, which shows
+      # all eclipses for a given target within the time window, we
+      # ignore these other constraints.
 
       my $start_is_observable = (($el_start_deg >= $minimum_start_elevation) 
-      	  and not $is_daytime_start);
+      	  and (not $is_daytime_start) and $ingress_in_window);
       my $end_is_observable = (($el_end_deg >= $minimum_end_elevation)
-      	  and not $is_daytime_end);
+      	  and (not $is_daytime_end) and $egress_in_window);
       my $is_observable = eval("\$start_is_observable $and_vs_or \$end_is_observable");
 
 
@@ -1464,7 +1496,7 @@ sub get_eclipses {
 	  
 	# Then the eclipse should be visible! ... but one more check: 
 
-	# Calculate the hour angles and aziumths at start; these are
+	# Calculate the hour angles and azimuths at start; these are
 	# relatively expensive to calculate, so we defer them to here: 
 	$target->datetime($dt_start);
 	my $az_start_deg = $target->az(format=>'deg');
@@ -1893,13 +1925,6 @@ sub get_eclipses {
 	my $local_date_end = $dt_end_local->ymd;
 	my $local_time_end = $dt_end_local->hm;
 
-
-	# Eclipse start and end were defined as DateTime objects
-	# above, but here we need them in JD:
-
-	my $eclipse_start_jd = $eclipse_jd - 0.5 * $eclipse_width/24.;
-	my $eclipse_end_jd = $eclipse_jd + 0.5 * $eclipse_width/24.;
-
 	# Flag conditions where the eclipse starts before sunset, or
 	# ends after sunrise:
 	$eclipse{ends_after_sunrise} = $is_daytime_end;
@@ -1913,21 +1938,21 @@ sub get_eclipses {
 	# For these start/end times, to save space in the output we take off
 	# 2,450,000 from the values, i.e. output = JD - 2450000
 
-	$eclipse{jd_start} = sprintf("%0.3f", $eclipse_start_jd
+	$eclipse{jd_start} = sprintf("%0.3f", $ingress_jd
 				     - 2450000);
-	$eclipse{jd_end} = sprintf("%0.3f", $eclipse_end_jd
+	$eclipse{jd_end} = sprintf("%0.3f", $egress_jd
 				   - 2450000);
 	$eclipse{jd_mid} = sprintf("%0.3f", $eclipse_jd
 				   - 2450000);
         
         # Same thing, except for the BJD values.
 	$eclipse{bjd_start} = sprintf("%0.4f", $eclipse_bjd -
-                                      0.5 * $eclipse_width/24. - 2450000);
+                                      $eclipse_half_dur_days - 2450000);
 
 	$eclipse{bjd_mid} = sprintf("%0.4f", $eclipse_bjd - 2450000);
 
 	$eclipse{bjd_end} = sprintf("%0.4f", $eclipse_bjd +
-                                    0.5 * $eclipse_width/24. - 2450000);
+                                    $eclipse_half_dur_days - 2450000);
 
 
 
