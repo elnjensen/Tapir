@@ -65,6 +65,12 @@ use Switch;
 use List::Util qw (min max); 
 use Text::CSV qw( csv );
 
+# We should be getting UTF-8 data from our target list, so make sure
+# we output in the same format. It's not clear whether this makes a
+# difference vs. just setting the character set in the HTTP header,
+# but it doesn't hurt. 
+binmode(STDOUT, ":utf8");
+
 ############# Variables for local configuration ##############
 
 # Put things here that are likely to need to be changed in order to
@@ -106,7 +112,7 @@ my $script_contact_person = 'Eric Jensen, ejensen1@swarthmore.edu';
 
 
 # Switch to turn on some very rudimentary debugging output:
-my $debug = 1;
+my $debug = 0;
 
 # Very rudimentary timing of the script:
 my $script_start_time = time;
@@ -1027,8 +1033,10 @@ if ($error_line_count > 0) {
 	$verb = "were";
     }
     $target_error_string = join(", ", @error_names_list);
-    print $q->p("The following $phrase incomplete data" .
-		" and $verb not used: $target_error_string");
+    if ($print_html == 1) {
+	print $q->p("The following $phrase incomplete data" .
+		    " and $verb not used: $target_error_string");
+    }
 }
 
 
@@ -1127,6 +1135,7 @@ if ($print_html) {   # True for either 1 or 2
   # Initialize the HTML template that will create the output.
   my $template = HTML::Template::Expr->new(filename =>
 					   $template_filename,
+					   utf8 => 1,
 					   die_on_bad_params => 0);
 
   # Pass the eclipse information, and the variables describing
@@ -1169,11 +1178,9 @@ if ($print_html) {   # True for either 1 or 2
   print $template->output();
 
   if ($print_html == 1) {
-      if ($debug) {
-	  my $execution_time = sprintf("Script took %d seconds for %d events.", 
-				       time - $script_start_time, $n_eclipses);
-	  print $q->p($execution_time);
-      }
+      my $execution_time = sprintf("Script took %d seconds for %d events.", 
+				   time - $script_start_time, $n_eclipses);
+      print $q->p($execution_time);
       print $q->end_html;
   }
 
@@ -1540,6 +1547,20 @@ sub get_eclipses {
 				   ($el_mid_deg >= $minimum_start_elevation) and 
 				   ($ha_mid >= $minimum_ha) and 
 				   ($ha_mid <= $maximum_ha));
+
+	# Catch a particular edge case, where a circumpolar target
+	# transits under the pole, but start and end are observable.
+	# If the mid-transit failed the HA limit check, then
+	# $mid_is_observable will tell us that.
+
+        # TODO: should do a more robust check here throughout the
+	# transit to make sure we don't exceed the HA limits.
+	# Do we also check elevation limits throughout?
+	if (($ha_start > $ha_end) and $start_is_observable and 
+	    $end_is_observable and (not $mid_is_observable)) {
+	    next ECLIPSE_LOOP;
+	}
+
 
         # Determine the uncertainty on the transit time by propagating
         # the period and epoch uncertainties.  These may be undefined
@@ -2748,7 +2769,7 @@ sub transit_svg {
 }
 
 sub bjd2utcjd {
-    # Given an input BJD time of an event at the solar system
+    # Given an input BJD_TDB time of an event at the solar system
     # barycenter, arriving from sky direction RA, Dec, return a
     # Julian Date specifying the UTC time that would be observed
     # on Earth.  The time is corrected for: 
@@ -2760,7 +2781,7 @@ sub bjd2utcjd {
     # It does *not* correct for:
     # - The position of the observer on Earth relative to the
     #   geocenter (~20 ms)
-    # - the difference between BJD and TT, i.e. the Einstein delay
+    # - the difference between TDB and TT, i.e. the Einstein delay
     #   that is predominantly a sinusoid of ~3.4 ms 
     # - Other effects at the ~ms level or less; see Eastman et
     #   al. 2010 PASP 122:935,
