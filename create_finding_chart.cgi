@@ -4,7 +4,7 @@
 # parameters come from finding_charts.cgi, and the finding chart is
 # created by calling the script get_finding_charts.pl.
 
-# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more

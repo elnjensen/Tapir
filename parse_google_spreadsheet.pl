@@ -4,7 +4,7 @@
 # reformat the data into an easy-to-parse format for use by the
 # transit finder code. 
 
-# Copyright 2012-2019 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
