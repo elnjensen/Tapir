@@ -1673,8 +1673,10 @@ sub get_eclipses {
 		    target => $target, 
 		    name => $name,
 		    start_time => $dt_start, 
+		    max_time => $dt_end,
 		    max_baseline => $max_baseline,
 		    minimum_elevation =>  $minimum_start_elevation,
+		    alt_min_elevation =>  $minimum_end_elevation,
 		    minimum_ha => $minimum_ha,
 		    maximum_ha => $maximum_ha,
 		    sun => $sun,
@@ -1704,8 +1706,10 @@ sub get_eclipses {
 		    target => $target, 
 		    name => $name,
 		    start_time => $dt_end, 
+		    max_time => $dt_start,
 		    max_baseline => $max_baseline,
 		    minimum_elevation =>  $minimum_end_elevation,
+		    alt_min_elevation =>  $minimum_start_elevation,
 		    minimum_ha => $minimum_ha,
 		    maximum_ha => $maximum_ha,
 		    sun => $sun,
@@ -1713,6 +1717,26 @@ sub get_eclipses {
 		    backward => 1,
 				}
 		);
+	}
+
+	# If the user specified unequal elevation limits, we can get
+	# odd behavior in calculating start and end times since it can
+	# be ambiguous how to handle a target that meets one limit but
+	# never meets the other - clean up some edge cases here.
+	if ($minimum_start_elevation != $minimum_end_elevation) {
+	    if ((not $start_is_observable) and
+		($obs_start_time < $dt_start)) {
+		# Push start time to just after ingress:
+		$obs_start_time = $dt_start->clone();
+		$obs_start_time->add(minutes => 1);
+	    }
+
+	    if ((not $end_is_observable) and
+		($obs_end_time > $dt_end)) {
+		# Push end time to just before egress:
+		$obs_end_time = $dt_end->clone();
+		$obs_end_time->subtract(minutes => 1);
+	    }
 	}
 
 	# Save this as JD for passing to ACP script:
@@ -2450,7 +2474,31 @@ sub observable_time {
 # 10 minutes. It is only used for the hour angle constraint, not the
 # daytime or elevation constraints. 
 
-# Inputs:  Hash ref 
+# Inputs:  Hash ref of input parameters:
+#   max_baseline: baseline to try, in hours
+#   start_time: DateTime object giving zero point for search, *not 
+#      including baseline*.  (Typically ingress or egress time.)  So
+#      we shift this by max_baseline to start the search. 
+#   backward: if this flag is true, search back in time.
+#   time_step_minutes:  Step size for hour angle search; others can be 
+#      calculated directly. 
+#   target, sun:  Astro::Coords instances for those bodies, containing
+#      info about their coords, observing location, and time. 
+#   twilight_rad:  Solar elevation in radians defining twilight. 
+#   minimum_elevation:  elevation in degrees above which target is
+#      considered observable. 
+#   alt_min_elevation:  As above, but alternate elevation to search if
+#     target never gets above minimum_elevation.  This is only relevant
+#     when finding start and stop times for targets with asymmetric
+#     limits.  During transit, either limit could apply. 
+#   max_time: DateTime object, time beyond which returned time should
+#     not extend.  This is used to keep pre-ingress limits from bleeding
+#     over and returning post-ingress start times in the unequal limit
+#     case.  If 'backward' is true, this is an *earliest* time limit.
+#   minimum_ha, maximum_ha:  hour angle limits, in hours. 
+#   name:  Target name - only used for informative error messages. 
+#
+# Returns: Datetime
 
     my $DEBUG = 0; 
 
@@ -2503,11 +2551,13 @@ sub observable_time {
     my $sun = $args->{'sun'};
     $sun->datetime($time);
 
+    # If the sun is still up at the start of the search window,
+    # adjust our time accordingly.
     if ( $sun->el(format=>'rad') > $args->{'twilight_rad'} ) {
 	# Note: these could fail if the search location is at polar
 	# latitudes and always-daylight times haven't been filtered
-	# out above.  For always-night times of year, we never get
-	# into this block. 
+	# out above, but they should have been handled already.  For
+	# always-night times of year, we never get into this block.
 	if ($sign == 1){
 	    # Next sunset:
 	    $time = $sun->set_time( horizon => $args->{'twilight_rad'});
@@ -2533,19 +2583,70 @@ sub observable_time {
     # if that's fine, we go on. If not, we find the time after that
     # (or prior to that) when it was at the limiting elevation:
 
+    my $el_to_satisfy = $args->{'minimum_elevation'};
+
     if ($el < $args->{'minimum_elevation'}) {
-	if ($sign == 1){
+
+	# If the target never reaches the desired elevation, these
+	# routines will return an undefined value for time.  In that
+	# case, we try an alternate elevation.  This can happen when
+	# ingress and egress are given different elevation limits.
+	# Typically we set start time by ingress limit and end time by
+	# egress limit, but if one of these can't be reached, we use
+	# the other.  If neither can be reached, this code should
+	# never be called since the event is unobservable - this will
+	# trigger an error on the elevation check below. 
+	if ($sign == 1) {
 	    # Next rise: 
-	    $time = $target->rise_time( horizon => 
-					DD2R*$args->{'minimum_elevation'});
+	    my $new_time = $target->rise_time( horizon => 
+					DD2R*$el_to_satisfy);
+	    # Make sure we find a time, and it is not past the end of
+	    # our search window: 
+	    if (defined($new_time) and 
+		(DateTime->compare($new_time, $args->{'max_time'}) != 1))
+	    {
+		# Found time to reach that limit, save it: 
+		$time = $new_time;
+	    } else {
+		# Couldn't achieve that, check alternate limit:
+		$el_to_satisfy = $args->{'alt_min_elevation'};
+		if ($el < $el_to_satisfy) {
+		    # Get rise time for this limit; when above "if"
+		    # isn't true, we don't get in here and $time is
+		    # unchanged since we've met the elev. limit. 
+		    $time = $target->rise_time( horizon => 
+						DD2R*$el_to_satisfy);
+		}
+	    }
 	} else {
-	    # Previous set:
-	    $time = $target->set_time( horizon =>
-				       DD2R*$args->{'minimum_elevation'}, 
+	    # Working backward, find previous set time: 
+	    my $new_time = $target->set_time( horizon =>
+				       DD2R*$el_to_satisfy, 
 				       event => -1);
+	    # Make sure we find a time, and it is not past the end of
+	    # our search window: 
+	    if (defined($new_time) and 
+		(DateTime->compare($new_time, $args->{'max_time'}) != -1))
+	    {
+		# Found time to reach that limit, save it: 
+		$time = $new_time;
+	    } else {
+		# Couldn't achieve that, check alternate limit:
+		$el_to_satisfy = $args->{'alt_min_elevation'};
+		if ($el < $el_to_satisfy) {
+		    $time = $target->set_time( horizon =>
+					       DD2R*$el_to_satisfy, 
+					       event => -1);
+		}
+	    }
 	}
+
+	# The above should find a time as long as either ingress or
+	# egress is observable, but if not, the error will be flagged
+	# below. 
+
 	$target->datetime($time);
-	$el =  $target->el(format=>'deg');
+	$el = $target->el(format=>'deg');
     }
 
     if ($DEBUG) {
@@ -2574,7 +2675,7 @@ sub observable_time {
     $el =  $target->el(format=>'deg');
 
     # Check, but allow a little rounding error: 
-    if ($el + 1 < $args->{'minimum_elevation'}) {
+    if ($el + 1 < $el_to_satisfy) {
 	my $inc_string = $inc->in_units( 'minutes' );
 	my $message = "Error with elevation calculation in sub observable_time" .
 	    ". Elevation is $el at time $time. (HA $ha, start time" . 
