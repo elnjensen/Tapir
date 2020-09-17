@@ -1548,19 +1548,6 @@ sub get_eclipses {
 				   ($ha_mid >= $minimum_ha) and 
 				   ($ha_mid <= $maximum_ha));
 
-	# Catch a particular edge case, where a circumpolar target
-	# transits under the pole, but start and end are observable.
-	# If the mid-transit failed the HA limit check, then
-	# $mid_is_observable will tell us that.
-
-        # TODO: should do a more robust check here throughout the
-	# transit to make sure we don't exceed the HA limits.
-	# Do we also check elevation limits throughout?
-	if (($ha_start > $ha_end) and $start_is_observable and 
-	    $end_is_observable and (not $mid_is_observable)) {
-	    next ECLIPSE_LOOP;
-	}
-
 
         # Determine the uncertainty on the transit time by propagating
         # the period and epoch uncertainties.  These may be undefined
@@ -1736,6 +1723,32 @@ sub get_eclipses {
 		# Push end time to just before egress:
 		$obs_end_time = $dt_end->clone();
 		$obs_end_time->subtract(minutes => 1);
+	    }
+	}
+
+	# Catch a particular edge case, where a circumpolar target
+	# transits under the pole, but start and end are observable.
+	# If the user has set any hour angle limits at all, then they
+	# will necessarily be violated somewhere in the observable
+	# interval in this case, so skip this event.  In principle we
+	# could try to slice up the event to show only the time on
+	# either side of the lower meridian, but the logic of that
+	# gets complicated pretty fast, so for now just skip these
+	# events.  See refine_ha_limits routine for a start at how to
+	# parse this out, but using that output would require more
+	# code here to re-check everything at the changed times.
+
+	if (($minimum_ha > -12) or ($maximum_ha < 12)) {
+	    # Some HA limits are set, check this:
+	    $target->datetime($obs_start_time);
+	    my $ha_obs_start = $target->ha(format=>'hour');
+	    $target->datetime($obs_end_time);
+	    my $ha_obs_end = $target->ha(format=>'hour');
+
+	    if (($ha_obs_start > 0) and ($ha_obs_end < 0)) {
+		# Target crosses lower meridian, must violate HA
+		# limits at some point:
+		next ECLIPSE_LOOP;
 	    }
 	}
 
