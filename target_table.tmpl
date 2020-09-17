@@ -648,7 +648,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
 
    <TMPL_IF EXPR="baseline_hrs > 0"> 
        <span style="opacity:0.5;display:block;margin-bottom:8px;
-       <TMPL_IF EXPR="(ha_pre <= minimum_ha) || (ha_pre >= maximum_ha)">color:red;
+       <TMPL_IF EXPR="(ha_pre < minimum_ha) || (ha_pre > maximum_ha)">color:red;
        </TMPL_IF>" >
 	 <TMPL_VAR NAME="ha_pre">
 	   &nbsp;&nbsp;
@@ -656,19 +656,19 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
    </TMPL_IF> 
 
 
-   <span <TMPL_IF EXPR="(start_ha <= minimum_ha) || (start_ha >= maximum_ha)"> style="color:red"  
+   <span <TMPL_IF EXPR="(start_ha < minimum_ha) || (start_ha > maximum_ha)"> style="color:red"  
          </TMPL_IF> > 
 	 <TMPL_VAR NAME="start_ha"></span>, &nbsp;  <br />
-   <span <TMPL_IF EXPR="(mid_ha <= minimum_ha) || (mid_ha >= maximum_ha)"> style="color:red"  
+   <span <TMPL_IF EXPR="(mid_ha < minimum_ha) || (mid_ha > maximum_ha)"> style="color:red"  
          </TMPL_IF> > 
          <TMPL_VAR NAME="mid_ha"></span>,  <br />
-   <span <TMPL_IF EXPR="(end_ha <= minimum_ha) || (end_ha >= maximum_ha)"> style="color:red"  
+   <span <TMPL_IF EXPR="(end_ha < minimum_ha) || (end_ha > maximum_ha)"> style="color:red"  
          </TMPL_IF> > &nbsp;
          <TMPL_VAR NAME="end_ha"></span>
 
    <TMPL_IF EXPR="baseline_hrs > 0"> 
        <span style="opacity:0.5;display:block;margin-top:8px;
-       <TMPL_IF EXPR="(ha_post <= minimum_ha) || (ha_post >= maximum_ha)">color:red;
+       <TMPL_IF EXPR="(ha_post < minimum_ha) || (ha_post > maximum_ha)">color:red;
        </TMPL_IF>" >
 	   &nbsp;&nbsp;
 	 <TMPL_VAR NAME="ha_post">
