@@ -210,6 +210,10 @@ function shiftCatalogTIC(sources) {
 	    // If no T mag was passed in, get it from this catalog entry: 
 	    if (Tmag == '') {
 		Tmag = parseFloat(sources[i].data.Tmag);
+		// Also update the popup for the central star symbol:
+		let p = centralStar.sources[0].popupDesc;
+		p = p.replace(/(<em>Tmag:<\/em> )(<br\/>)/, '$1' + Tmag + '$2');
+		centralStar.sources[0].popupDesc = p;
 	    }
 	    // Most of the time this block won't run since i = 0;
 	    if (i > 0) {
