@@ -1,0 +1,131 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="content-type">
+
+<script type='text/javascript' src='https://code.jquery.com/jquery-1.9.1.min.js' charset='utf-8'></script>
+<script type='text/javascript' src='https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js' charset='utf-8'>
+</script>
+<script type='text/javascript' src='vizier_mirrors.js' charset='utf-8'></script>
+<!-- Functions for Aladin Lite finder interface. -->
+<script type='text/javascript' src='aladin-tess.js' charset='utf-8'></script>
+
+<script type='text/javascript' charset='utf-8'>
+
+var timeout = null;
+
+function setCoords() {
+
+    document.getElementById('ra').value = '';
+    document.getElementById('dec').value = '';
+    document.getElementById('coord-message').innerHTML='';
+    let target = document.getElementById('name').value;
+
+    // Don't try to match unless there's a non-whitespace char: 
+    if (target.match(/\S/)) {
+	clearTimeout(timeout);
+	// Wait 1/3 second for typing to stop:
+	timeout = setTimeout(resolveCoords, 333);
+    }
+}
+
+function resolveCoords() {
+    target = document.getElementById('name').value;
+    
+    // For TIC sources only, strip a trailing .01 or 
+    // other number if present; otherwise the name
+    // won't resolve: 
+    if (target.match(/^TIC/)) {
+	target = target.replace(/\.\d+$/, '');
+    }
+
+    ra_input = document.getElementById('ra');
+    dec_input = document.getElementById('dec');
+    m = document.getElementById('coord-message');
+    m.innerHTML='<i>Resolving...</i>';
+    Sesame.getTargetRADec(target, 
+			  function(d) {
+			      ra_input.value = (d.ra).toPrecision(7);
+			      dec_input.value = (d.dec).toPrecision(7);
+			      m.innerHTML='';
+			  }, 
+			  function(){m.innerHTML='<span style="color:red"><i>Could not resolve</i></span>';}
+			  );
+}
+   
+$('document').ready(function() {
+	i = document.getElementById('name');
+	i.addEventListener('keyup', setCoords);
+    });
+
+</script>
+
+
+
+
+<title>Aladin Finding Chart</title>
+    
+<link rel="stylesheet" href="page_style.css" type="text/css">
+
+</head>
+<body>
+<h2>Aladin Lite finding charts</h2>
+
+<p> 
+This form allows you to use <a href="https://aladin.u-strasbg.fr/AladinLite/"> 
+Aladin Lite</a> to explore a given
+astronomical target, by specifying either the coordinates, or an
+object name to be resolved.  
+</p>
+
+<FORM METHOD="GET" ACTION="aladin.html"> 
+
+<p>
+Target name:
+<input type="text" size="15" id="name"
+    name="name"  style="text-align:center" />
+<i>&nbsp;(Will be resolved on entry by <a href="http://cds.u-strasbg.fr/cgi-bin/Sesame">Sesame</a>.)</i>
+</p>
+
+<p>
+    <label for="ra">RA (decimal degrees or hh:mm:ss, J2000):</label>
+<INPUT TYPE="text" id="ra" name="ra" value=' '>
+	     &nbsp; &nbsp; <span id='coord-message'></span><br />
+Dec (decimal degrees or dd:mm:ss, J2000): <INPUT TYPE="text" id="dec" name="dec">
+</p>
+
+<p>
+<INPUT TYPE="submit" VALUE="Submit">
+</p>
+<hr>
+			<h3> Optional:</h3>
+<p> For TESS targets, enter the target magnitude (if known) and depth of transit to show stars that could blend in TESS images to mimic the on-source transit: <br/>
+			<INPUT TYPE="text" id="depth" name="depth">&nbsp; ppt<br/>
+			<INPUT TYPE="text" id="mag" name="mag"> mag <br/> 
+									      If the target T magnitude is not provided it will be determined from the TIC if the input source has a TIC number, but the depth field is required for this (optional) feature to work. 
+</p>
+<p>
+<INPUT TYPE="submit" VALUE="Submit">
+</p>
+</FORM>
+
+<p>
+This page was created by <a
+href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+tool is part of <a
+href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+package</a> for planning astronomical observations; the <a
+href="https://github.com/elnjensen/Tapir">source code</a> is
+freely available.   You can also make <a
+    href="airmass.cgi">airmass plots</a>, or <a href="transits/">plan
+    transiting exoplanet observations</a>.
+</p>
+
+<p>
+Feedback welcome!  Send <a
+href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on finding chart form"
+>here</a>.
+</p>
+</body>
+
+</html>

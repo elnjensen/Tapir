@@ -1,0 +1,415 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<meta charset="utf-8"/>
+<title>Aladin Lite finding chart</title>
+
+<link rel='stylesheet' href='https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css' />
+<script type='text/javascript' src='https://code.jquery.com/jquery-1.9.1.min.js' charset='utf-8'></script>
+<script type='text/javascript' src='https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js' charset='utf-8'>
+</script>
+<script type='text/javascript' src='vizier_mirrors.js' charset='utf-8'></script>
+<!-- Functions for Aladin Lite finder interface. -->
+<script type='text/javascript' src='aladin-tess.js' charset='utf-8'></script>
+
+
+<!-- Some styling for aligning equations at = sign, based on
+https://stackoverflow.com/questions/22763127/aligning-text-on-a-specific-character -->
+
+<style>
+.equation div {
+	 display: flex;
+	 width: 60%;
+}
+
+.equation div span {
+     flex: 1;
+}
+
+.equation div span:first-of-type {
+    text-align: right;
+    padding-right: 5px;
+     font-style: italic;
+}
+
+.equation div span:last-of-type {
+    padding-left: 5px;
+}
+
+<!-- Prevent browser from flagging initial field as invalid with red border-->
+input: {
+    border:none;
+    box-shadow:none;
+}
+input:invalid {
+    box-shadow:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+
+<div id='checkboxes' style='text-align: center; width: 100%; margin-bottom: 10px; margin-top: 10px;'>
+
+<span id="tic-group" style="white-space:nowrap;">
+<input type="checkbox" id="tic" onclick="toggleElements(this)">
+<label for="tic"><span id='tic-N-sources'></span> TIC sources within 5&apos;
+<!-- Legend symbol, initially hidden -->
+<svg width="15" height="15" viewBox="0 0 15 15" style="align: center">
+  <path id="tic-legend" d="M 3 6 L 12 15 M 3 15 L 12 6"
+     style="fill:none;stroke-width:2.0;stroke:none;" />
+</svg>
+</label>
+</span>
+
+<span id="gaia-blend-group" style="white-space:nowrap;">
+     &nbsp;&nbsp;
+<input type="checkbox" id="gaia" onclick="toggleElements(this)">
+<label for="gaia" id="gaia-blend-label"><span id='gaia-blends-N-sources'></span> Possibly-blending Gaia sources within 2.5&apos; for depth 
+<input type="number" id="depth-input" size="5" step="0.1" min="0"
+oninput="setTimeout(changeGaiaNeighbors(this.value),200)"> ppt
+<!-- Legend symbol, initially hidden -->
+<svg width="15" height="15" viewBox="0 0 15 15" style="align: center">
+  <rect id="gaia-legend" width="9" height="9" x="3" y="5"
+     style="fill:none;stroke-width:2.0;stroke:none;" />
+</svg>
+</label>
+</span>
+    &nbsp;&nbsp;
+<span id="gaia-group" style="white-space:nowrap;">
+<input type="checkbox" id="gaiaAll" onclick="toggleElements(this)">
+<label for="gaiaAll">All <span id='gaia-N-sources'></span> Gaia sources within 5&apos;
+<!-- Legend symbol, initially hidden -->
+<svg width="15" height="15" viewBox="0 0 16 16" style="align: center">
+  <circle id="gaiaAll-legend" r="6" cx="7.5" cy="9"
+     style="fill:none;stroke-width:2.0;stroke:none;" />
+</svg>
+</label>
+</span>
+    &nbsp;&nbsp;
+<span id="simbad-group" style="white-space:nowrap;">
+<input type="checkbox" id="simbad" onclick="toggleElements(this)">
+<label for="simbad">Simbad sources
+<!-- Legend symbol, initially hidden -->
+<svg width="16" height="16"  viewBox="0 0 17 17">
+  <polygon id="simbad-legend" points="7,4 14,16 2,16" 
+		    style="fill:none;stroke-width:2.5;stroke:none;" />
+</svg>
+</label> 
+</span>
+
+&nbsp;&nbsp;&nbsp;
+
+<span style="white-space:nowrap;" id="tess-ffi-group">
+TESS FFI layer opacity:
+<input id='ffi_slider' style='vertical-align:middle;width:20vw;' step='0.01' 
+		min='0' max='1' type='range' value='0'>&nbsp;&nbsp;
+<span id='ffiAlpha'> 0 </span>
+</span>
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+<span id='surveys'  style="white-space:nowrap;">
+Images: &nbsp;
+<input type="radio" id="panstarrs-button" name="survey" value="P/PanSTARRS/DR1/color-z-zg-g" 
+   onclick="aladin.setImageSurvey(value)"><label for="panstarrs" id="panstarrs-label">Pan-STARRS</label>
+&nbsp;&nbsp;
+<input type="radio" id="dss-button" name="survey" value="P/DSS2/color" 
+   onclick="aladin.setImageSurvey(value)"><label for="dss2" id="dss-label">DSS2</label>
+&nbsp;&nbsp;
+<input type="radio" id="sdss-button" name="survey" value="P/SDSS9/color" 
+   onclick="aladin.setImageSurvey(value)"><label for="sdss" id="sdss-label">SDSS</label>
+
+</span>
+
+</div>
+
+<div id='aladin-lite-div' style='width: 100%; height: 95%' onclick='mouseToRaDec(event,true)'></div>
+
+
+<script type='text/javascript' charset='utf-8'>
+
+// Get params from URL
+const urlParams = new URLSearchParams(window.location.search);
+
+// This is our default value; may get changed below: 
+var vizierServer = 'https://vizier.cfa.harvard.edu/';
+
+
+// If the Vizier URL is already cached, use it.  Otherwise, set a
+// default value and then asynchronously query for the nearest mirror.
+// It may not be set by the time we make our first Vizier query, but
+// it will be there for next time:
+
+if (localStorage.getItem('VizierURL')) {
+    // Do a sanity check to make sure that the stored value
+    // actually seems like a URL before setting: 
+    const myURL = localStorage.getItem('VizierURL');
+    if (/https.*vizier.*/.test(myURL)) {
+	console.log('Using saved server ' + myURL);
+	vizierServer = myURL;
+    } else {
+	localStorage.removeItem('VizierURL');
+	setVizier();
+    }
+} else {
+    // Start the query: 
+    setVizier();
+}
+
+// Override the saved value if needed for testing:
+if (urlParams.has('ip')) {
+    setVizier(urlParams.get('ip'));
+}
+
+// A few numbers we will use: 
+const gaiaRadius = 2.5/60;
+const fieldSize = 40/60;
+
+// Some constants we'll use throughout: 
+const ms2year = 1/(365.242189 * 86400 * 1000);
+const mas2deg = 1/(3600*1000.);
+const deg2rad = Math.PI / 180;
+
+
+// Parse URL params, with defaults for each.
+
+// First and most important is to make sure we have the field 
+// center coordinates - we can't do much without them. Often 
+// they will be passed as part of the URL parameters, but if 
+// not, we'll have to resolve the name and wait until that 
+// completes before we can do anything else. 
+
+var have_center_coords = false; 
+var ra_center = null;
+var dec_center = null;
+var ra_string = null;
+var starname = '';
+var tic_number = 0;
+
+if (urlParams.has('name')) {
+    starname = urlParams.get('name');
+    // Get just the number; first drop the leading 'TIC':
+    if (starname.match(/TIC/)) {
+	tic_number = starname.replace(/^TIC */, '');
+	// Then possibly trailing .01, .02 etc., which ExoFOP doesn't like: 
+	tic_number = tic_number.split('.')[0];
+    }
+    // Just cosmetic, but if there is no space between the 'TIC' and the 
+    // number, add it in: 
+    if (starname.match(/^TIC\d/)) {
+	starname = starname.replace('TIC', 'TIC ');
+    }
+    document.title = starname;
+}
+
+// Regex for sexagesimal coord string: three sets of digits, separated
+// by at least one colon or space, with optional extra whitespace. The
+// \1 is a backreference to for the second delimeter to match the
+// first, to detect the case of mixing colons and spaces as
+// delimiters, since that would cause the parsing code to fail.
+let coordRe = /\d+\s*?(:|\s)\s*?\d+\s*?\1\s*?\d+/;
+
+// Regex for a pure number, with optional leading and/or trailing space, 
+// and optional leading sign.  The second part in parentheses is to 
+// match a case like ".345" with no digit before decimal place. 
+let numberRe = /^\s*[+-]?(\d+\.?\d*|\.\d+)\s*$/;
+
+if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) && 
+    urlParams.has('dec') && coordRe.test(urlParams.get('dec'))) {
+    // Convert RA from hours to degrees: 
+    ra_center = sexagesimalToDecimal(urlParams.get('ra').trim())*15;
+    ra_string = '' + ra_center;
+    dec_center = sexagesimalToDecimal(urlParams.get('dec').trim());
+    if (ra_center && dec_center) {
+	have_center_coords = true; 
+    } else {
+	alert("Could not parse entered coordinates: " + urlParams.get('ra') + 
+	      ' ' + urlParams.get('dec'));
+    }
+} else if (urlParams.has('ra') && numberRe.test(urlParams.get('ra')) && 
+	   urlParams.has('dec') && numberRe.test(urlParams.get('dec'))) {
+    // Use decimal coords from URL.  Work around a quirk of Vizier query - if
+    // RA param is an integer, Vizier interprets it as hours, not
+    // degrees. Add a decimal point in that case to get correct
+    // interpretation.
+    ra_string = urlParams.get('ra');
+    if (! ra_string.includes('.')) {
+	ra_string = ra_string + '.0';
+    }
+    ra_center = parseFloat(ra_string);
+    dec_center = parseFloat(urlParams.get('dec'));
+    have_center_coords = true; 
+} else if (urlParams.has('name') && (/\S+/.test(starname))) {
+    /* Already got name from URL above;
+    attempt to resolve name into coords.  First function
+    is success callback, second is failure callback.
+    */
+    let matchname;
+    if (tic_number != 0) {
+	// Construct TIC name without trailing .01, .02, etc.
+	matchname = 'TIC ' + tic_number;
+    } else {
+	matchname = starname;
+    }
+    Sesame.getTargetRADec(matchname, 
+			  function(d) {
+			      ra_center=d.ra; 
+			      dec_center=d.dec; 
+			      ra_string = d.ra;
+			      have_center_coords=true; 
+			      console.log('Resolved '+matchname+': '+d.ra+', '+d.dec)
+				  }, 
+			  function(){alert('Could not resolve '+matchname+' into coordinates.')}
+			  );
+} else {
+    let message = "Must specify either target name ('name') or field RA and Dec ('ra', 'dec') in URL.\n";
+    message += "If you provided coordinates and still see this message, the coordinates could not be interpreted.";
+    alert(message);
+}
+
+var Tmag = '';
+if (urlParams.has('mag')) {
+    Tmag = parseFloat(urlParams.get('mag'));
+    // The parameter could have been empty, so make sure we
+    // actually got a number: 
+    if (isNaN(Tmag)) {
+	Tmag = '';
+    }
+}
+
+// If no depth is passed, we leave it set to 'null' which can be used 
+// as a boolean later for whether to show that part of the interface. 
+var depth = null;
+if (urlParams.has('depth')) {
+    depth = parseFloat(urlParams.get('depth'));
+} 
+
+// Could be null or NaN if not passed or was blank: 
+if (! depth) {
+    // Don't show this part of the interface if depth is missing or empty: 
+    document.getElementById('gaia-blend-group').innerHTML = "";
+}
+
+// Are the blending Gaia stars shown initially? 
+var showGaiaBlends = false;
+if (urlParams.has('showBlends')) {
+    showGaiaBlends = Boolean(parseFloat(urlParams.get('showBlends')));
+}
+
+//  Same idea for the other catalogs: 
+// Are they shown initially? 
+var showGaia = false;
+if (urlParams.has('showGaia')) {
+    showGaia = Boolean(parseFloat(urlParams.get('showGaia')));
+}
+var showTIC = false;
+if (urlParams.has('showTIC')) {
+    showTIC = Boolean(parseFloat(urlParams.get('showTIC')));
+}
+var showSimbad = false;
+if (urlParams.has('showSimbad')) {
+    showSimbad = Boolean(parseFloat(urlParams.get('showSimbad')));
+}
+
+/* Now get the delta mag we want, based on the depth of 
+   the transit.  Depth is in ppt, so convert and find 
+   as a delta mag. */
+const depthDeltaMag = -2.5*Math.log10((depth || 0)/1000.);
+
+
+// Colors for different symbols:
+const colors = { simbad: "lightblue", 
+		 gaia: "green",
+		 gaiaBlends: "green",
+		 gaiaAll: "#cc99ff",
+		 tic:  "#FBB917"};
+
+const gaia_options = {color: 'lightgreen', lineWidth: 1, 
+		      opacity: 0.5, name: "Gaia 2.5' circle"};
+
+// Boolean to track if we've finished shifting sources in the TIC:
+var TIC_is_done = false;
+
+// Save hashes of deltaT and Tmag values for some sources, so 
+// we can also display them with Gaia sources.  These will be
+// filled in by shiftCatalogTIC, and indexed by Gaia number. 
+// We declare them here so they are global. 
+var deltaT_vals = {};
+var Tmag_vals = {};
+var TIC_vals = {};
+
+// Globals for various elements of the display.  Initially these 
+// are undefined, but will get set in the various functions
+// below that set them up at the appropriate time:
+var centralStar = null;
+var TIC = null;
+var gaiaBlends = null;
+var gaiaAll = null;
+var Gaia_boundary = null;
+var hipsSimbad = null;
+var aladin = null;
+var field_center = null;
+var center_coo = null;
+
+// Since we might still be waiting for coordinates, wrap the 
+// initialization of the Aladin div and loading of image survey
+// in a function that will wait as needed for coordinates. 
+
+async function setupAladin() {
+
+    // Since we might not have coords yet, need to wait a 
+    // bit before proceeding.  But don't keep
+    // waiting indefinitely - after 10 seconds give up and move on. 
+    let waited = 0;
+    while ((! have_center_coords) && (waited < 10000)) {
+	await sleep(100);
+	waited += 100;  // milliseconds
+    }
+
+    if (waited >= 10000) {
+	alert('Waited 10 seconds and did not resolve coordinates.');
+    }
+
+    // Make sure this includes the string RA due to note above: 
+    field_center = ra_string + ' ' + dec_center;
+    center_coo = new Coo(ra_center, dec_center);
+
+    // As soon as we have the field center, load the div. Pan-STARRS
+    // is complete down to about -30 but a little jaggy there, so 
+    // back up 1 degree; otherwise use DSS2. 
+    var imageSurvey;
+    if (dec_center < -29) {
+	imageSurvey = 'P/DSS2/color';
+	document.getElementById('dss-button').checked=true;
+    } else {
+	imageSurvey = 'P/PanSTARRS/DR1/color-z-zg-g';
+	document.getElementById('panstarrs-button').checked=true;
+    }
+    
+    aladin = A.aladin('#aladin-lite-div', {target: field_center, 
+					   fov: fieldSize,
+					   survey: imageSurvey});
+
+    // Call the various functions to set up different aspects of the display, now that we 
+    // have the Aladin framework defined: 
+    findSurveyCoverage();
+    setupCentralStar();
+    setupTIC();
+    setupGaia();
+    setupSimbad();
+    setupFFI();
+    setAladinHeight();
+}
+
+// Call the above master function that sets everything up: 
+setupAladin();
+
+
+$(window).resize(setAladinHeight);
+
+</script>
+
+</body> </html>
