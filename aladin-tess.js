@@ -641,11 +641,7 @@ function mouseToRaDec(event, copyToClipboard) {
 
     let xymouse = aladin.view.imageCanvas.relMouseCoords(event);
     let radec = aladin.view.aladin.pix2world(xymouse.x, xymouse.y);
-    var cooString = Numbers.toSexagesimal(radec[0]/15, 7, false).replaceAll(' ', ':');
-    cooString += ' ' + Numbers.toSexagesimal(radec[1], 6, false).replaceAll(' ', ':');
-    // Fix the fact that aladin routine doesn't give leading zero 
-    // on some later elements if less than 10: 
-    cooString = cooString.replace(/:(\d)\./g, ':0$1.');
+    let cooString = radec[0].toPrecision(8) + ' ' + radec[1].toPrecision(8);
     // Optionally copy coordinates to the clipboard:
     if ((copyToClipboard) && (event.altKey)) {
 	navigator.clipboard.writeText(cooString);
