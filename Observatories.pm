@@ -587,6 +587,13 @@ our %observatories_eastern_us = (
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
+
+	   "C.E.K. Mees Observatory, Univ. Rochester, NY" => {
+	       latitude => 42.7002778,
+	       longitude => -77.4087667,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
 				);
 
 
