@@ -285,14 +285,6 @@ if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) &&
     alert(message);
 }
 
-
-// Could be null or NaN if not passed or was blank: 
-// Disable this for now as we work on resolving depth locally...
-//if (! depth) {
-//    // Don't show this part of the interface if depth is missing or empty: 
-//    document.getElementById('gaia-blend-group').innerHTML = "";
-//}
-
 // Are the blending Gaia stars shown initially? 
 var showGaiaBlends = false;
 if (urlParams.has('showBlends')) {
