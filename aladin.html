@@ -189,6 +189,29 @@ var ra_string = null;
 var starname = '';
 var tic_number = 0;
 
+var Tmag = '';
+if (urlParams.has('mag')) {
+    Tmag = parseFloat(urlParams.get('mag'));
+    // The parameter could have been empty, so make sure we
+    // actually got a number: 
+    if (isNaN(Tmag)) {
+	Tmag = '';
+    }
+}
+
+// If no depth is passed, we leave it set to 'null' which can be used 
+// as a boolean later for whether to show that part of the interface. 
+var depth = null;
+if (urlParams.has('depth')) {
+    depth = parseFloat(urlParams.get('depth'));
+} 
+
+/* Now get the delta mag we want, based on the depth of the transit.
+   Depth is in ppt, so convert and find as a delta mag.  If depth is
+   not (yet) defined use a large depth that won't yield any blends.
+   If depth is defined later, this should be updated as well. */
+var depthDeltaMag = -2.5*Math.log10((depth || 1E10)/1000.);
+
 if (urlParams.has('name')) {
     starname = urlParams.get('name');
     // Get just the number; first drop the leading 'TIC':
@@ -254,44 +277,21 @@ if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) &&
     } else {
 	matchname = starname;
     }
-    Sesame.getTargetRADec(matchname, 
-			  function(d) {
-			      ra_center=d.ra; 
-			      dec_center=d.dec; 
-			      ra_string = d.ra;
-			      have_center_coords=true; 
-			      console.log('Resolved '+matchname+': '+d.ra+', '+d.dec)
-				  }, 
-			  function(){alert('Could not resolve '+matchname+' into coordinates.')}
-			  );
+    // Try to resolve coords; this async function will set necessary variables once it succeeds. 
+    resolveCoords(matchname);
 } else {
     let message = "Must specify either target name ('name') or field RA and Dec ('ra', 'dec') in URL.\n";
     message += "If you provided coordinates and still see this message, the coordinates could not be interpreted.";
     alert(message);
 }
 
-var Tmag = '';
-if (urlParams.has('mag')) {
-    Tmag = parseFloat(urlParams.get('mag'));
-    // The parameter could have been empty, so make sure we
-    // actually got a number: 
-    if (isNaN(Tmag)) {
-	Tmag = '';
-    }
-}
-
-// If no depth is passed, we leave it set to 'null' which can be used 
-// as a boolean later for whether to show that part of the interface. 
-var depth = null;
-if (urlParams.has('depth')) {
-    depth = parseFloat(urlParams.get('depth'));
-} 
 
 // Could be null or NaN if not passed or was blank: 
-if (! depth) {
-    // Don't show this part of the interface if depth is missing or empty: 
-    document.getElementById('gaia-blend-group').innerHTML = "";
-}
+// Disable this for now as we work on resolving depth locally...
+//if (! depth) {
+//    // Don't show this part of the interface if depth is missing or empty: 
+//    document.getElementById('gaia-blend-group').innerHTML = "";
+//}
 
 // Are the blending Gaia stars shown initially? 
 var showGaiaBlends = false;
@@ -313,11 +313,6 @@ var showSimbad = false;
 if (urlParams.has('showSimbad')) {
     showSimbad = Boolean(parseFloat(urlParams.get('showSimbad')));
 }
-
-/* Now get the delta mag we want, based on the depth of 
-   the transit.  Depth is in ppt, so convert and find 
-   as a delta mag. */
-const depthDeltaMag = -2.5*Math.log10((depth || 0)/1000.);
 
 
 // Colors for different symbols:

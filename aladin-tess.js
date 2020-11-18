@@ -48,7 +48,69 @@ async function setVizier(ip='') {
     }
 }
 
+async function getToiInfo(target) {
+    // Query our local target list of TOIs to get the coordinates,
+    // magnitude and transit depth.  Returns a JSON object.  If status
+    // = 1, other fields should be populated. If status = 0, the
+    // target was not found or the name could not be interpreted.
 
+    let toidata;
+    const result = await $.get('tess_transit_depth.cgi?name=' + target, 
+			 success=function(data) {
+			     toidata = data;
+			 }
+			 ).fail(function(jqXHR, textStatus, errorThrown) {
+				 alert("Failed to call tess_transit_depth.");
+				 console.log("Status, error: ", textStatus, errorThrown);
+				 toidata = { "status": 0 };
+			     });
+    console.log("Resolved target " + target + " in getToiInfo.");
+    console.log(toidata);
+    return toidata;
+}
+
+async function resolveCoords(target) {
+    // Try to resolve coordinates of the given target.  First we try
+    // locally with our TOI file, and if that fails, we try Sesame.
+    // As a side effect, if we succeed in resolving it locally, we
+    // also set target magnitude and depth if they are not already
+    // set.
+
+    info = await getToiInfo(target);
+    if (info.status) {
+	// Got the values, set vars:
+	// Convert RA from hours to degrees:
+	ra_center = sexagesimalToDecimal(info.RA)*15.;
+	dec_center = sexagesimalToDecimal(info.Dec);
+	ra_string = ra_center;
+
+	if (! depth) {
+	    depth = parseFloat(info.depth);
+	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
+	}
+	if (! Tmag) {
+	    Tmag = parseFloat(info.Tmag);
+	}
+	if (! tic_number) {
+	    tic_number = (info.name).replace(/^TIC */, '');
+	    // Then possibly trailing .01, .02 etc., which ExoFOP doesn't like: 
+	    tic_number = tic_number.split('.')[0];
+	}
+	have_center_coords=true;
+    } else {
+	// Didn't succeed there, try Sesame instead: 
+	Sesame.getTargetRADec(target,
+			      function(d) {
+				  ra_center=d.ra; 
+				  dec_center=d.dec; 
+				  ra_string = d.ra;
+				  have_center_coords=true; 
+				  console.log('Resolved '+matchname+': '+d.ra+', '+d.dec)
+				      }, 
+			      function(){alert('Could not resolve '+matchname+' into coordinates.')}
+			      );
+    }
+}
 
 async function findSurveyCoverage() {
     // Query the MOC server to determine which surveys cover this field,
@@ -138,7 +200,7 @@ function currentEpoch() {
 }
 
 
-function shiftCatalogTIC(sources) {
+async function shiftCatalogTIC(sources) {
     /* Callback function to process the TIC catalog returned by a
        Vizier query.  Take a catalog of sources as input, and shift
        positions to the current epoch based on proper motions. Also
@@ -148,6 +210,25 @@ function shiftCatalogTIC(sources) {
        TIC_is_done to allow other functions to know when this update
        has completed.
     */
+
+    // If there is no starname defined, then the only input was the
+    // coordinates.  In that case, use the TIC source closest to the
+    // center as the target star.  Also see if we can find it in the
+    // local target file to get its depth and TOI number.
+    if ((starname == '') && (sources.length > 0)) {
+	console.log("No central star name passed in.");
+	tic_number = sources[0].data.TIC;
+	starname = 'TIC ' + tic_number;
+	console.log("Setting from nearest TIC source: " + starname);
+	Tmag = parseFloat(sources[0].data.Tmag);
+	// Try to get further info from local target file: 
+	info = await getToiInfo(starname);
+	if (info.status && (! depth)) {
+	    depth = parseFloat(info.depth);
+	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
+	}
+	setupCentralStar();
+    }
 
     const current_epoch = currentEpoch();
     // Will update this if/when we find the TIC entry for the central star: 
@@ -404,6 +485,8 @@ async function shiftCatalogGaia(sources) {
 	waited += 100;  // milliseconds
     }
 
+    console.log("!! In shiftCatalogGaia using Tmag = " + Tmag);
+
     const current_epoch = currentEpoch();
     var neighbors = [];
     for (i=0; i < sources.length; i++) {
@@ -466,6 +549,7 @@ async function shiftCatalogGaia(sources) {
 	sources[i].data.shiftedMag = (mag - magOffset).toPrecision(6);
 	if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
 	    (dist <= gaiaRadius)) {
+	    console.log(mag, Tmag, depthDeltaMag, magOffset)
 	    neighbors.push(sources[i]);
 	} 
     }
@@ -655,7 +739,7 @@ function mouseToRaDec(event, copyToClipboard) {
 
 function sexagesimalToDecimal(c) {
     /* Convert colon- or space-separated sexagesimal coordinates
-       to decimal.  Does not do any hours -> conversion.
+       to decimal.  Does not do any hours -> degrees conversion.
     */
 
     var split_pattern;

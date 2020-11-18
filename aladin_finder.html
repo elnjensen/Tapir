@@ -29,27 +29,77 @@ function setCoords() {
     }
 }
 
+function resolveFailed() {
+    m = document.getElementById('coord-message');
+    m.innerHTML='<span style="color:red"><i>Could not resolve</i></span>';
+}
+
 function resolveCoords() {
     target = document.getElementById('name').value;
     
+    ra_input = document.getElementById('ra');
+    dec_input = document.getElementById('dec');
+    depth_input = document.getElementById('depth');
+    mag_input = document.getElementById('mag');
+    m = document.getElementById('coord-message');
+
+    m.innerHTML='<i>Resolving...</i>';
+
+    // If it's a TIC or TOI name, try to resolve it locally 
+    // from the local TOI list:
+
     // For TIC sources only, strip a trailing .01 or 
     // other number if present; otherwise the name
-    // won't resolve: 
+    // won't resolve through Simbad (though it would 
+    // be OK locally: 
     if (target.match(/^TIC/)) {
 	target = target.replace(/\.\d+$/, '');
     }
 
+    if (target.match(/^(TIC|TOI)/i)) {
+	// Try to resolve locally: 
+	var url = 'tess_transit_depth.cgi?name=' + target;
+
+	$.get(url, 
+	      success=function(data) {
+		  mydata = data;
+		  if (data.status) {
+		      ra_input.value = data.RA;
+		      dec_input.value = data.Dec;
+		      m.innerHTML = '';
+		      depth_input.value = data.depth;
+		      mag_input.value = data.Tmag;
+		  } else {
+		      // TIC or TOI not found, try Sesame:
+		      resolveSesame(target);
+		  }
+	      }
+	      // Chain to Sesame if call fails: 
+	      ).fail(function(jqXHR, textStatus, errorThrown) {
+		      alert("Failed to call tess_transit_depth, trying Sesame.");
+		      console.log("Status, error: ", textStatus, errorThrown);
+		      resolveSesame(target);
+		  });
+    } else {
+	// Try to resolve non-TIC / non-TOI with Sesame: 
+	resolveSesame(target);
+    }
+}
+
+var sesame_data;
+
+function resolveSesame(target) {
     ra_input = document.getElementById('ra');
     dec_input = document.getElementById('dec');
     m = document.getElementById('coord-message');
-    m.innerHTML='<i>Resolving...</i>';
     Sesame.getTargetRADec(target, 
 			  function(d) {
+			      sesame_data = d
 			      ra_input.value = (d.ra).toPrecision(7);
 			      dec_input.value = (d.dec).toPrecision(7);
 			      m.innerHTML='';
 			  }, 
-			  function(){m.innerHTML='<span style="color:red"><i>Could not resolve</i></span>';}
+			  resolveFailed,
 			  );
 }
    
