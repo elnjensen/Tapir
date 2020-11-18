@@ -64,7 +64,11 @@ async function getToiInfo(target) {
 				 console.log("Status, error: ", textStatus, errorThrown);
 				 toidata = { "status": 0 };
 			     });
-    console.log("Resolved target " + target + " in getToiInfo.");
+    if (toidata.status) {
+	console.log("Resolved target " + target + " in getToiInfo.");
+    } else {
+	console.log("Did not find target " + target + " in getToiInfo.");
+    }
     console.log(toidata);
     return toidata;
 }
@@ -158,7 +162,7 @@ async function findSurveyCoverage() {
 function setupCentralStar() {
     // Mark the central star if one was passed in.  We may update
     // coords later if they get shifted based on proper motion. 
-    centralStar = A.catalog({name: 'Central star', sourceSize: 18});
+    centralStar = A.catalog({name: 'Central star', sourceSize: 18, color: colors.centralStar});
     if (starname != '') {
 	aladin.addCatalog(centralStar);
 	// Set the popup text with some useful information and links:
@@ -485,8 +489,6 @@ async function shiftCatalogGaia(sources) {
 	waited += 100;  // milliseconds
     }
 
-    console.log("!! In shiftCatalogGaia using Tmag = " + Tmag);
-
     const current_epoch = currentEpoch();
     var neighbors = [];
     for (i=0; i < sources.length; i++) {
@@ -549,7 +551,6 @@ async function shiftCatalogGaia(sources) {
 	sources[i].data.shiftedMag = (mag - magOffset).toPrecision(6);
 	if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
 	    (dist <= gaiaRadius)) {
-	    console.log(mag, Tmag, depthDeltaMag, magOffset)
 	    neighbors.push(sources[i]);
 	} 
     }
