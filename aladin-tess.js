@@ -232,6 +232,16 @@ async function shiftCatalogTIC(sources) {
 	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
 	}
 	setupCentralStar();
+    } else if (! depth) {
+	// Could have a central star name but no depth; see if we can
+	// resolve that:
+	// Try to get further info from local target file: 
+	info = await getToiInfo(starname);
+	if (info.status) {
+	    depth = parseFloat(info.depth);
+	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
+	    console.log("No depth provided but found " + depth + " from local TOI file.");
+	}
     }
 
     const current_epoch = currentEpoch();
