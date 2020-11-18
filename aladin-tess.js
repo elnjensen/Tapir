@@ -232,16 +232,27 @@ async function shiftCatalogTIC(sources) {
 	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
 	}
 	setupCentralStar();
-    } else if (! depth) {
-	// Could have a central star name but no depth; see if we can
-	// resolve that:
-	// Try to get further info from local target file: 
+    } else if ((! depth) || (! Tmag)) {
+	// Could have a central star name but no depth and/or mag; see
+	// if we can resolve that from local target file:
 	info = await getToiInfo(starname);
 	if (info.status) {
-	    depth = parseFloat(info.depth);
-	    depthDeltaMag = -2.5*Math.log10((depth)/1000.);
-	    console.log("No depth provided but found " + depth + " from local TOI file.");
+	    if (! depth) {
+		depth = parseFloat(info.depth);
+		depthDeltaMag = -2.5*Math.log10((depth)/1000.);
+		console.log("No depth provided but found " + depth + " from local TOI file.");
+	    }
+	    if (! Tmag) {
+		Tmag = parseFloat(info.Tmag);
+	    }
 	}
+    }
+
+    // If we still don't have a Tmag from the above, pull it from the
+    // closest TIC source:
+    if (! Tmag) {
+	console.log("Setting Tmag from nearest TIC source: " + sources[0].data.TIC);
+	Tmag = parseFloat(sources[0].data.Tmag);
     }
 
     const current_epoch = currentEpoch();
