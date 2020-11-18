@@ -310,6 +310,9 @@ async function shiftCatalogTIC(sources) {
 		p = p.replace(/(<em>Tmag:<\/em> )(<br\/>)/, '$1' + Tmag + '$2');
 		centralStar.sources[0].popupDesc = p;
 	    }
+	    // Make a note of the Gaia ID of this entry so we can
+	    // exclude it from the list of blending stars later:
+	    centralStar.gaia = sources[i].data.GAIA;
 	    // Most of the time this block won't run since i = 0;
 	    if (i > 0) {
 		alert("TIC entry matching entered name is not closest" + 
@@ -560,7 +563,8 @@ async function shiftCatalogGaia(sources) {
 	// Save this mag for possible neighbor recalculation later: 
 	sources[i].data.shiftedMag = (mag - magOffset).toPrecision(6);
 	if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
-	    (dist <= gaiaRadius)) {
+	    (dist <= gaiaRadius) && 
+	    (sources[i].data.Source != centralStar.gaia)) {
 	    neighbors.push(sources[i]);
 	} 
     }
@@ -592,6 +596,7 @@ function changeGaiaNeighbors(depth) {
     let s = gaiaAll.sources;
     for (i = 0; i < s.length; i++) {
 	if ((s[i].data.shiftedMag) && 
+	    (s[i].data.Source != centralStar.gaia) &&
 	    (s[i].data.shiftedMag <= magThreshold) && 
 	    (s[i].data.r_deg <= gaiaRadius)) {
 	    neighbors.push(s[i]);
