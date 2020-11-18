@@ -687,7 +687,7 @@ function setupSimbad() {
 function setupFFI() {
     // Add a TESS FFI image layer
     aladin.setOverlayImageLayer(aladin.createImageSurvey('TESS', 'TESS', 
-							 'https://astro.swarthmore.edu/TESS_HiPS/', 
+							 'https://astro.swarthmore.edu/HiPS/TESS/', 
 							 'J2000', 5, {imgFormat: 'png'}));
     aladin.getOverlayImageLayer().setAlpha(0);
 
