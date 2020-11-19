@@ -517,9 +517,24 @@ input[type=submit] {
  and optionally any filters (e.g. minimum transit depth or elevation).
  The output includes transit time and elevation, and links to further
  information about each object, including finding charts and airmass
- plots.  (There are also stand-alone pages for generating <a
- href="https://astro.swarthmore.edu/finding_charts.cgi">finding charts</a> and <a
+ plots.  (There are also stand-alone pages for generating finding
+ charts (<a
+ href="https://astro.swarthmore.edu/finding_charts.cgi">annotated
+ JPGs</a> or using <a href="aladin_finder.html">Aladin Lite</a>) and <a
  href="https://astro.swarthmore.edu/airmass.cgi">airmass plots</a> for any target.)  </p>
+
+<p style="color:purple"> 
+<em> 
+Latest update (Nov. 2020): the links to the Skymap finding charts have
+been replaced with a new interactive view for each target based on
+Aladin Lite with the option to overlay <a
+href="https://astro.swarthmore.edu/HiPS/TESS/">TESS images</a>; check
+them out and  <a
+href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
+>let me know</a> what you think.  There is also a <a
+href="aladin_finder.html">standalone page</a> for these.
+</em>
+</p>
 
 <FORM METHOD="GET" ACTION="print_transits.cgi"> 
 
