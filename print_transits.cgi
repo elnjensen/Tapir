@@ -1552,15 +1552,20 @@ sub get_eclipses {
         # Determine the uncertainty on the transit time by propagating
         # the period and epoch uncertainties.  These may be undefined
         # for particular targets.  If both are undefined, leave this
-        # uncertainty field as undefined.  If only one is undefined,
-        # it won't hurt the calculation since it will evaluate to zero
-        # when used as a scalar, so it won't contribute to the
-        # uncertainty calculation: 
+        # uncertainty field as undefined.
         my ($midtime_uncertainty_string, 
 	    $midtime_uncertainty_hours,
 	    $midtime_uncertainty_duration); 
         if ( ( defined $period_uncertainty ) or 
              ( defined $epoch_uncertainty ) ) {
+	   # We know at least one is defined; to avoid error messages,
+           # set the other to zero if undefined:
+	   if ( not defined $period_uncertainty ) {
+	       $period_uncertainty = 0;
+	   }
+	   if ( not defined $epoch_uncertainty ) {
+	       $epoch_uncertainty = 0;
+	   }
            # Input uncertainties are in days; add in quadrature and
 	   # convert to hours: 
            $midtime_uncertainty_hours = 24. * sqrt($epoch_uncertainty**2 +
@@ -1582,6 +1587,7 @@ sub get_eclipses {
               60 * ($midtime_uncertainty_hours - int($midtime_uncertainty_hours))); 
         } else {
 	   $midtime_uncertainty_duration = hours_to_duration(0); 
+	   $midtime_uncertainty_hours = 0;
 	}
 
 	# If a non-zero baseline is requested, also calculate relevant quantities 
@@ -1710,7 +1716,8 @@ sub get_eclipses {
 	# odd behavior in calculating start and end times since it can
 	# be ambiguous how to handle a target that meets one limit but
 	# never meets the other - clean up some edge cases here.
-	if ($minimum_start_elevation != $minimum_end_elevation) {
+	if (($minimum_start_elevation != $minimum_end_elevation) and
+	    (not $observing_from_space)) {
 	    if ((not $start_is_observable) and
 		($obs_start_time < $dt_start)) {
 		# Push start time to just after ingress:
@@ -1738,7 +1745,8 @@ sub get_eclipses {
 	# parse this out, but using that output would require more
 	# code here to re-check everything at the changed times.
 
-	if (($minimum_ha > -12) or ($maximum_ha < 12)) {
+	if ( (($minimum_ha > -12) or ($maximum_ha < 12)) and
+	     (not $observing_from_space)) {
 	    # Some HA limits are set, check this:
 	    $target->datetime($obs_start_time);
 	    my $ha_obs_start = $target->ha(format=>'hour');
