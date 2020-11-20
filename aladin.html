@@ -188,6 +188,7 @@ var dec_center = null;
 var ra_string = null;
 var starname = '';
 var tic_number = 0;
+var tic_number_full; // Possibly includes trailing .01, etc.
 
 var Tmag = '';
 if (urlParams.has('mag')) {
@@ -216,9 +217,9 @@ if (urlParams.has('name')) {
     starname = urlParams.get('name');
     // Get just the number; first drop the leading 'TIC':
     if (starname.match(/TIC/)) {
-	tic_number = starname.replace(/^TIC */, '');
+	tic_number_full = starname.replace(/^TIC */, '');
 	// Then possibly trailing .01, .02 etc., which ExoFOP doesn't like: 
-	tic_number = tic_number.split('.')[0];
+	tic_number = tic_number_full.split('.')[0];
     }
     // Just cosmetic, but if there is no space between the 'TIC' and the 
     // number, add it in: 
@@ -272,8 +273,9 @@ if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) &&
     */
     let matchname;
     if (tic_number != 0) {
-	// Construct TIC name without trailing .01, .02, etc.
-	matchname = 'TIC ' + tic_number;
+	// Reconstruct TIC name possibly including trailing .01, .02, etc.
+	// Those can be resolved locally, but won't match in Sesame. 
+	matchname = 'TIC ' + tic_number_full;
     } else {
 	matchname = starname;
     }

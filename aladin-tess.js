@@ -102,8 +102,11 @@ async function resolveCoords(target) {
 	}
 	have_center_coords=true;
     } else {
-	// Didn't succeed there, try Sesame instead: 
-	Sesame.getTargetRADec(target,
+	// Didn't succeed there, try Sesame instead.  If the TIC name
+	// passed had a trailing .01, .02, etc., remove it before
+	// passing to Sesame since that won't be resolved in the TIC. 
+	let matchname = target.replace(/^(TIC\s*\d+)\.\d+$/,'$1');
+	Sesame.getTargetRADec(matchname,
 			      function(d) {
 				  ra_center=d.ra; 
 				  dec_center=d.dec; 

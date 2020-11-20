@@ -95,25 +95,29 @@ if (scalar(@lines) == 0) {
 
 my @fields = ("name", "TOI", "depth", "RA", "Dec", "Tmag");
 
-print "{\n\"status\": 1,\n";
+# Could try to make this more general at some point but for now just
+# return the first match if multiple TIC numbers match up.  (Matching
+# on TOI should be unique, but if we strip the .01, .02 etc. from the
+# TIC number, that could match multiple stars.
 
-foreach my $t (@lines) {
-    my $i = 0;
-    # Copy the mag field to one with a more accurate name. Even though
-    # it's really TESS mag, the mag field is labeled 'vmag' for
-    # compatibility with other target files.
-    $t->{Tmag} = $t->{vmag};
-    foreach my $f (@fields) {
-	print "\"$f\": \"$t->{$f}\"";
-	# No trailing comma on last field:
-	if ($i == $#fields) {
-	    print "\n";
-	} else {
-	    print ",\n";
-	}	
-	$i++;
-    }
-    print "}\n"
-;}
+my $t = $lines[0];
+print "{\n\"status\": 1,\n";
+my $i = 0;
+# Copy the mag field to one with a more accurate name. Even though
+# it's really TESS mag, the mag field is labeled 'vmag' for
+# compatibility with other target files.
+$t->{Tmag} = $t->{vmag};
+foreach my $f (@fields) {
+    print "\"$f\": \"$t->{$f}\"";
+    # No trailing comma on last field:
+    if ($i == $#fields) {
+	print "\n";
+    } else {
+	print ",\n";
+    }	
+    $i++;
+}
+print "}\n";
+
 
 
