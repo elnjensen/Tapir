@@ -525,8 +525,8 @@ input[type=submit] {
 
 <p style="color:purple"> 
 <em> 
-Latest update (Nov. 2020): the links to the Skymap finding charts have
-been replaced with a new interactive view for each target based on
+Latest update (Dec. 2020): in addition to the links to the Sky-Map
+    finding charts, I have added a new interactive view for each target based on
 Aladin Lite with the option to overlay <a
 href="https://astro.swarthmore.edu/HiPS/TESS/">TESS images</a>; check
 them out and  <a
