@@ -436,11 +436,7 @@ while ($time <= $end) {
     # Change timezone as needed for labeling: 
     $time->set_time_zone($timezone);
     # Create a mouseover label for the datapoint:
-    my $time_label =  $time->hms();
-    # Strip the seconds:
-    $time_label =~ s/:\d\d$//;
-    # Strip a leading zero if present:
-    $time_label =~ s/^0//;
+    my $time_label =  $time->hm();
     my $label = sprintf("%s, %0.2f",  $time_label, $airmass);
     my $datestring = $formatter->format_datetime($time);
     push @data, [$datestring, $airmass, $label];
@@ -586,8 +582,7 @@ if ($jd_start ne "") {
     my $transit_start = 
 	DateTime::Format::Epoch::JD->parse_datetime($jd_start);
     $transit_start->set_time_zone($timezone);
-    $transit_start_label = $transit_start->hms;
-    $transit_start_label =~ s/:\d\d$//;
+    $transit_start_label = $transit_start->hm;
     if ($transit_start >= $start) {
 	$transit_start_frac = ($transit_start->epoch - $start->epoch)/$span;
 	my $transit_start_string = $formatter->format_datetime($transit_start);
@@ -610,8 +605,7 @@ if ($jd_end ne "") {
     my @end_data = ();
     my $transit_end = DateTime::Format::Epoch::JD->parse_datetime($jd_end);
     $transit_end->set_time_zone($timezone);
-    $transit_end_label = $transit_end->hms;
-    $transit_end_label =~ s/:\d\d$//;
+    $transit_end_label = $transit_end->hm;
     if ($transit_end <= $end) {
 	my $transit_end_string = $formatter->format_datetime($transit_end);
 	push @end_data, ($transit_end_string, 100);
@@ -838,3 +832,18 @@ sub define_cookie {
     return $cookie;
 }
     
+sub DateTime::hm {
+  # Just a simple shortcut for formatting ease, since the 
+  # DateTime package doesn't provide a built-in method for 
+  # only hours and minutes.  This also rounds to the nearest minute,
+  # rather than truncating. 
+  my $dt = shift;
+  my ($h,$m,$s) = split(/:/, $dt->hms()); 
+  $m++ if ($s >= 30); 
+  # But if rounding up crosses an hour boundary, handle that:
+  if ($m == 60) {
+      $m = 0;
+      $h = ($h == 23) ? 0 : $h + 1;
+  }
+  return sprintf("%d:%02d", $h, $m);
+}
