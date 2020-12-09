@@ -864,6 +864,10 @@ sub num_only {
     # Whitespace is also allowed. 
 
     my $input = shift @_;
-    $input =~ s/[^\d+-.,:\s]//g;
-    return $input;
+    if (defined($input)) {
+	$input =~ s/[^\d+-.,:\s]//g;
+	return $input;
+    } else {
+	return "";
+    }
 }
