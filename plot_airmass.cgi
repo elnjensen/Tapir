@@ -44,6 +44,7 @@ use CGI;
 use CGI::Cookie;
 use LWP::Simple;
 use Math::Trig;
+use HTML::Entities;
 
 use strict;
 use warnings;
@@ -77,8 +78,9 @@ if ($observatory_string !~ /$flag_for_manual_entry/) {
     ($observatory_latitude, $observatory_longitude,
      $temporary_timezone, $observatory_name) 
 	= split(/;/, $observatory_string);
-    # Add a period to the name for later printing ease:
-    $observatory_name .= ". ";
+    # Make sure name is encoded for printing, and 
+    # add a period to the name for later printing ease:
+    $observatory_name =  encode_entities($observatory_name) . ". ";
 } else {
     $observatory_longitude = $q->param("observatory_longitude");
     $observatory_latitude = $q->param("observatory_latitude");
@@ -92,7 +94,11 @@ if ($observatory_string !~ /$flag_for_manual_entry/) {
 				 $temporary_timezone);
 }
 
-$timezone = $temporary_timezone;
+# Make sure latitude and longitude only have valid chars: 
+$observatory_longitude = num_only($observatory_longitude);
+$observatory_latitude = num_only($observatory_latitude);
+
+$timezone = encode_entities($temporary_timezone);
 
 if ($timezone eq '') {
     $timezone = "UTC";
@@ -125,7 +131,7 @@ if ((not defined $plot_moon) or ($plot_moon eq "")) {
 }
 
 # Check to see if they set the parameter to change airmass scale:
-my $max_airmass = $q->param("max_airmass");
+my $max_airmass = num_only($q->param("max_airmass"));
 if ((not defined $max_airmass) or ($max_airmass eq "")) {
     $max_airmass = 2.4;
 }
@@ -143,12 +149,12 @@ push @cookies, define_cookie('invert',
 			     $invert);
 
 
-my $jd = $q->param("jd");
-my $jd_start = $q->param("jd_start");
-my $jd_end = $q->param("jd_end");
+my $jd = num_only($q->param("jd"));
+my $jd_start = num_only($q->param("jd_start"));
+my $jd_end = num_only($q->param("jd_end"));
 
 # Start date:
-my $start_date_string = $q->param("start_date");
+my $start_date_string = encode_entities($q->param("start_date"));
 if ((not defined $start_date_string) or ($start_date_string eq "")) {
     $start_date_string = 'today';
 }
@@ -184,9 +190,9 @@ if ($jd_end ne "") {
 }
 
 
-my $ra = $q->param("ra");
-my $dec = $q->param("dec");
-my $target_input = $q->param("target");
+my $ra = num_only($q->param("ra"));
+my $dec = num_only($q->param("dec"));
+my $target_input = encode_entities($q->param("target"));
 
 # Choose an alternate Vizier mirror if one isn't working:
 #my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
@@ -846,4 +852,18 @@ sub DateTime::hm {
       $h = ($h == 23) ? 0 : $h + 1;
   }
   return sprintf("%d:%02d", $h, $m);
+}
+
+sub num_only {
+    # Take input and return a string that includes only
+    # characters that match the pattern we expect for 
+    # numbers.  In addition to digits, we allow plus and 
+    # minus signs, both period and comma (both could be 
+    # decimal separators depending on locale), and colon
+    # to allow for colon-separated sexagesimal coords. 
+    # Whitespace is also allowed. 
+
+    my $input = shift @_;
+    $input =~ s/[^\d+-.,:\s]//g;
+    return $input;
 }
