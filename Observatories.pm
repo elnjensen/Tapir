@@ -216,8 +216,13 @@ our %observatories_western_north_america = (
 	       latitude => 32.6133,
 	       longitude => -116.3319,
 	       timezone => 'America/Los_Angeles',
-	   },
+	   }, 
 
+	   "Rothney Astrophysical Observatory (Calgary)" => {
+	       latitude => 50.868039,
+	       longitude => -114.291142,
+	       timezone => 'America/Edmonton',
+	   }, 
 
 					   );
 
