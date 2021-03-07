@@ -134,8 +134,13 @@ Images: &nbsp;
 // Get params from URL
 const urlParams = new URLSearchParams(window.location.search);
 
+// Vizier mirrors are having issues; temporarily change
+// default to Strasbourg server, don't query mirrors or
+// used cached server value: 
+var vizierServer = 'https://vizier.u-strasbg.fr/';
+
 // This is our default value; may get changed below: 
-var vizierServer = 'https://vizier.cfa.harvard.edu/';
+//var vizierServer = 'https://vizier.cfa.harvard.edu/';
 
 
 // If the Vizier URL is already cached, use it.  Otherwise, set a
@@ -143,21 +148,21 @@ var vizierServer = 'https://vizier.cfa.harvard.edu/';
 // It may not be set by the time we make our first Vizier query, but
 // it will be there for next time:
 
-if (localStorage.getItem('VizierURL')) {
-    // Do a sanity check to make sure that the stored value
-    // actually seems like a URL before setting: 
-    const myURL = localStorage.getItem('VizierURL');
-    if (/https.*vizier.*/.test(myURL)) {
-	console.log('Using saved server ' + myURL);
-	vizierServer = myURL;
-    } else {
-	localStorage.removeItem('VizierURL');
-	setVizier();
-    }
-} else {
-    // Start the query: 
-    setVizier();
-}
+// if (localStorage.getItem('VizierURL')) {
+//     // Do a sanity check to make sure that the stored value
+//     // actually seems like a URL before setting: 
+//     const myURL = localStorage.getItem('VizierURL');
+//     if (/https.*vizier.*/.test(myURL)) {
+// 	console.log('Using saved server ' + myURL);
+// 	vizierServer = myURL;
+//     } else {
+// 	localStorage.removeItem('VizierURL');
+// 	setVizier();
+//     }
+// } else {
+//     // Start the query: 
+//     setVizier();
+// }
 
 // Override the saved value if needed for testing:
 if (urlParams.has('ip')) {
