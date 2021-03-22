@@ -224,6 +224,12 @@ our %observatories_western_north_america = (
 	       timezone => 'America/Edmonton',
 	   }, 
 
+          "New Mexico Skies, Mayhill, NM" => {
+              latitude => 32.90388889,
+              longitude => -105.52888889,
+              timezone_integer => 7,
+              timezone => 'MST7MDT',
+          },
 					   );
 
 
