@@ -65,8 +65,8 @@ push @cookies, define_cookie('invert',
 my $target_name;
 
 # Choose an alternate Vizier mirror if one isn't working:
-my $vizier_mirror = "http://cdsweb.u-strasbg.fr/cgi-bin/";
-#my $vizier_mirror = "http://vizier.cfa.harvard.edu/viz-bin/";
+my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
+#my $vizier_mirror = "https://vizier.cfa.harvard.edu/viz-bin/";
 
 if (($ra eq '') and ($target_input ne '')) {
     # No RA given, try to resolve name with Simbad:
