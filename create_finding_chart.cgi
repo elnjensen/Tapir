@@ -30,6 +30,7 @@ use CGI;
 use CGI::Cookie;
 use LWP::Simple;
 use Astro::Coords;
+use HTML::Entities;
 
 use strict;
 use warnings;
@@ -42,17 +43,19 @@ my $script_contact_person = 'Eric Jensen, ejensen1@swarthmore.edu';
 
 # Get some input settings from the URL:
 
-my $ra = $q->param("ra");
-my $dec = $q->param("dec");
+my $ra = num_only($q->param("ra"));
+my $dec = num_only($q->param("dec"));
+my $field_width = num_only($q->param("field_width"));
+my $field_height = num_only($q->param("field_height"));
+my $show_detector = num_only($q->param("show_detector"));
+my $detector_width = num_only($q->param("detector_width"));
+my $detector_height = num_only($q->param("detector_height"));
+
+# This gets checked later: 
 my $target_input = $q->param("target");
-my $field_width = $q->param("field_width");
-my $field_height = $q->param("field_height");
-my $show_detector = $q->param("show_detector");
-my $detector_width = $q->param("detector_width");
-my $detector_height = $q->param("detector_height");
 
 # Check to see if they set the parameter to invert colors:
-my $invert = $q->param("invert");
+my $invert = num_only($q->param("invert"));
 if ((not defined $invert) or ($invert eq "")) {
     $invert = 0;
 }
@@ -97,8 +100,9 @@ if (($ra eq '') and ($target_input ne '')) {
 	}
     } else {
 	my $err_title = "Error in object name";
+	my $err_input = encode_entities($target_input);
 	my $err_message = "Input does not look like an object name:"
-	    . " <pre>$target_input</pre>." .
+	    . " <pre>$err_input</pre>." .
 	    " If you feel this should have been resolvable by"
 	    . " Simbad or NED, please contact $script_contact_person.";
 	fatal_error($err_title, $err_message);
@@ -306,3 +310,20 @@ sub define_cookie {
     return $cookie;
 }
     
+sub num_only {
+    # Take input and return a string that includes only
+    # characters that match the pattern we expect for 
+    # numbers.  In addition to digits, we allow plus and 
+    # minus signs, both period and comma (both could be 
+    # decimal separators depending on locale), and colon
+    # to allow for colon-separated sexagesimal coords. 
+    # Whitespace is also allowed. 
+
+    my $input = shift @_;
+    if (defined($input)) {
+	$input =~ s/[^\d+-.,:\s]//g;
+	return $input;
+    } else {
+	return "";
+    }
+}

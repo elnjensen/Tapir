@@ -61,6 +61,7 @@ use HTML::Template::Expr;
 use CGI;
 use CGI::Cookie;
 use URI::Escape;
+use HTML::Entities;
 use Switch;
 use List::Util qw (min max); 
 use Text::CSV qw( csv );
@@ -168,15 +169,23 @@ if ($observatory_string !~ /$flag_for_manual_entry/) {
 # here, even though it is a path separator, because it is a legitimate
 # part of some timezone names. 
 if ($temporary_timezone =~ m%^\s*([_/+\-0-9A-Za-z]+)$%) {
-    $observatory_timezone = $1;
+    $observatory_timezone = encode_entities($1);
 } else {
-    die "Unrecognized timezone: [$temporary_timezone]\n";
+    my $err_timezone = encode_entities($temporary_timezone);
+    die "Unrecognized timezone: [$err_timezone]\n";
 }
+
+# Make sure latitude and longitude only have valid chars: 
+$observatory_longitude = num_only($observatory_longitude);
+$observatory_latitude = num_only($observatory_latitude);
+# And likewise for names: 
+$observatory_name = encode_entities($observatory_name);
+$observatory_shortname = encode_entities($observatory_shortname);
 
 # Check to see if they set the parameter to use UTC no matter what.
 # We keep $observatory_timezone set to the local timezone, but 
 # use this boolean to check what to use for output for main display. 
-my $use_utc = $q->param("use_utc");
+my $use_utc = num_only($q->param("use_utc"));
 if ((not defined $use_utc) or ($use_utc =~ /^\s*$/)) {
     $use_utc = 0;
 }
@@ -184,19 +193,19 @@ if ((not defined $use_utc) or ($use_utc =~ /^\s*$/)) {
 # Desired time windows for data:
 
 # Start date:
-my $start_date_string = $q->param("start_date");
+my $start_date_string = encode_entities($q->param("start_date"));
 if ((not defined $start_date_string) or ($start_date_string =~ /^\s*$/)) {
     $start_date_string = 'today';
 }
 
 # Days in the future to print (including start date):
-my $days_to_print = $q->param("days_to_print");
+my $days_to_print = num_only($q->param("days_to_print"));
 if ((not defined $days_to_print) or ($days_to_print =~ /^\s*$/)) {
     $days_to_print = 1;
 }
 
 # Days in the past (based from start date) to print:
-my $days_in_past = $q->param("days_in_past");
+my $days_in_past = num_only($q->param("days_in_past"));
 
 # If they didn't specify a backward-looking window, then only show
 # future eclipses:
@@ -205,38 +214,38 @@ if ((not defined $days_in_past) or ($days_in_past =~ /^\s*$/)) {
 }
 
 # Minimum start/end elevation to show; default to 0:
-my $minimum_start_elevation = $q->param("minimum_start_elevation");
+my $minimum_start_elevation = num_only($q->param("minimum_start_elevation"));
 if ((not defined $minimum_start_elevation) 
     or ($minimum_start_elevation =~ /^\s*$/)) {
   $minimum_start_elevation = 0;
 }
 
-my $minimum_end_elevation = $q->param("minimum_end_elevation");
+my $minimum_end_elevation = num_only($q->param("minimum_end_elevation"));
 if ((not defined $minimum_end_elevation) 
     or ($minimum_end_elevation =~ /^\s*$/)) {
   $minimum_end_elevation = 0;
 }
 
 # Min/max hour angle to show; default to +/- 12H:
-my $minimum_ha = $q->param("minimum_ha");
+my $minimum_ha = num_only($q->param("minimum_ha"));
 if ((not defined $minimum_ha) 
     or ($minimum_ha =~ /^\s*$/)) {
   $minimum_ha = -12;
 }
 
-my $maximum_ha = $q->param("maximum_ha");
+my $maximum_ha = num_only($q->param("maximum_ha"));
 if ((not defined $maximum_ha) 
     or ($maximum_ha =~ /^\s*$/)) {
   $maximum_ha = 12;
 }
 
-my $baseline_hrs = $q->param("baseline_hrs");
+my $baseline_hrs = num_only($q->param("baseline_hrs"));
 if ((not defined $baseline_hrs) 
     or ($baseline_hrs =~ /^\s*$/)) {
   $baseline_hrs = 0;
 }
 
-my $show_unc = $q->param("show_unc");
+my $show_unc = num_only($q->param("show_unc"));
 if ((not defined $show_unc) 
     or ($show_unc =~ /^\s*$/)) {
   $show_unc = 0;
@@ -245,7 +254,7 @@ if ((not defined $show_unc)
 
 # Fall back on 'or' behavior if there is it isn't defined,
 # or if there is anything other that "and" or "or" in that flag: 
-my $and_vs_or = $q->param("and_vs_or");
+my $and_vs_or = lc($q->param("and_vs_or"));
 if ((not defined $and_vs_or) 
     or ($and_vs_or eq "") or ($and_vs_or !~ /^(and|or)$/)) {
   $and_vs_or = "or";
@@ -254,7 +263,7 @@ if ((not defined $and_vs_or)
 
 # Special flag for observing from space; no elevation or day/night
 # constraints on transit visibility:
-my $observing_from_space = $q->param("space");
+my $observing_from_space = num_only($q->param("space"));
 if ((not defined $observing_from_space) 
     or ($observing_from_space eq "")) {
   $observing_from_space = 0;
@@ -263,35 +272,35 @@ if ((not defined $observing_from_space)
 
 
 # Minimum priority to show; default to zero:
-my $minimum_priority = $q->param("minimum_priority");
+my $minimum_priority = num_only($q->param("minimum_priority"));
 if ((not defined $minimum_priority) or ($minimum_priority eq "")) {
   $minimum_priority = 0;
 }
 
 # Minimum depth (in ppt) to show; default to zero:
-my $minimum_depth = $q->param("minimum_depth");
+my $minimum_depth = num_only($q->param("minimum_depth"));
 if ((not defined $minimum_depth) or ($minimum_depth =~ /^\s*$/)) {
   $minimum_depth = 0;
 }
 
 # Maximum (faintest) V mag to show:
-my $maximum_V_mag = $q->param("maximum_V_mag");
+my $maximum_V_mag = num_only($q->param("maximum_V_mag"));
 if ((not defined $maximum_V_mag) or ($maximum_V_mag =~ /^\s*$/)) {
   $maximum_V_mag = 30;
 }
 
 # Maximum airmass for airmass plots:
-my $max_airmass = $q->param("max_airmass");
+my $max_airmass = num_only($q->param("max_airmass"));
 if ((not defined $max_airmass) or ($max_airmass =~ /^\s*$/)) {
   $max_airmass = 2.4;
 }
 
 # Target name string to match (can be a regex):
-my $target_string = $q->param("target_string");
+my $target_string = encode_entities($q->param("target_string"));
 if (not defined $target_string) {
     $target_string = '';
 } else {
-# Strip leading and trailing whitespace on this string:
+    # Strip leading and trailing whitespace on this string:
     $target_string =~ s/^\s*(\S+)\s*$/$1/;
 }
 
@@ -330,6 +339,21 @@ if ((not defined $twilight) or ($twilight =~ /^\s*$/)) {
 my $phase = $q->param("phase");
 if ((not defined $phase) or ($phase =~ /^\s*$/)) {
   $phase = 0;
+}
+
+my $par_ref;
+# If some parameters are entered with a comma instead of decimal point
+# (different localization), substitute so the number is handled
+# correctly:
+foreach $par_ref (\$observatory_latitude, \$observatory_longitude,
+		  \$twilight, \$max_airmass, \$maximum_V_mag,
+		  \$minimum_start_elevation, \$minimum_end_elevation,
+		  \$minimum_ha, \$maximum_ha, \$days_to_print,
+		  \$days_in_past, \$phase, \$minimum_depth,
+		  \$minimum_priority) {
+    if ($$par_ref =~ /\d,\d/) {
+	$$par_ref =~ s/,/\./;
+    }
 }
 
 
@@ -952,7 +976,8 @@ foreach my $target_ref (@lines) {
   }
 
   # See if the target is too faint:
-  if ($target_info{vmag} > $maximum_V_mag) {
+  if ((defined $target_info{vmag}) and 
+      ($target_info{vmag} > $maximum_V_mag)) {
       next TARGET_LOOP;
   }
 
@@ -2724,10 +2749,17 @@ sub DateTime::hm {
   my $dt = shift;
   my ($h,$m,$s) = split(/:/, $dt->hms()); 
   $m++ if ($s >= 30); 
-  # But if rounding up crosses an hour boundary, handle that:
+  # If rounding up crosses an hour boundary, handle that.  However,
+  # we do not round 23:59:30+ up to 00:00, since that causes issues
+  # elsewhere in the code when we cross a date boundary but the hh:mm
+  # and date may be getting passed separately.  So:
   if ($m == 60) {
-      $m = 0;
-      $h = ($h == 23) ? 0 : $h + 1;
+      if ($h == 23) {
+	  $m = 59; # Put it back where it was
+      } else {
+	  $m = 0;
+	  $h++;
+      }
   }
   return sprintf("%02d:%02d", $h, $m);
 }
@@ -2952,3 +2984,21 @@ sub bjd2utcjd {
     return $bjd - $delta_t/86400;
 }
 
+
+sub num_only {
+    # Take input and return a string that includes only
+    # characters that match the pattern we expect for 
+    # numbers.  In addition to digits, we allow plus and 
+    # minus signs, both period and comma (both could be 
+    # decimal separators depending on locale), and colon
+    # to allow for colon-separated sexagesimal coords. 
+    # Whitespace is also allowed. 
+
+    my $input = shift @_;
+    if (defined($input)) {
+	$input =~ s/[^\d+-.,:\s]//g;
+	return $input;
+    } else {
+	return "";
+    }
+}

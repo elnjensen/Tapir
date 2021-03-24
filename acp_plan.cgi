@@ -31,7 +31,7 @@
 
 use CGI;
 use DateTime::Format::Epoch::JD;
-
+use HTML::Entities;
 
 use strict;
 use warnings;
@@ -43,12 +43,12 @@ my $script_contact_person = 'Eric Jensen, ejensen1@swarthmore.edu';
 
 # Get some input settings from the URL:
 
-my $jd_start = $q->param("jd_start");
-my $jd_end = $q->param("jd_end");
+my $jd_start = num_only($q->param("jd_start"));
+my $jd_end = num_only($q->param("jd_end"));
 # Above are for start and end of transit, this is quit time
 # for script based on other constraints: 
-my $jd_quit = $q->param("jd_quit");
-my $V = $q->param("V");
+my $jd_quit = num_only($q->param("jd_quit"));
+my $V = num_only($q->param("V"));
 
 # Sometimes abbreviated versions of the transit start/end times might
 # be passed in; fix them.
@@ -113,9 +113,9 @@ my $start_datetime_string = sprintf("%s %02d:%02d", $start_datetime->mdy("/"),
 				  $start_datetime->minute() );
 
 
-my $ra = $q->param("ra");
-my $dec = $q->param("dec");
-my $target = $q->param("target");
+my $ra = num_only($q->param("ra"));
+my $dec = num_only($q->param("dec"));
+my $target = encode_entities($q->param("target"));
 
 # Replace whitespace in target name with underscores: 
 $target =~ s/\s+/_/g;
@@ -175,4 +175,23 @@ sub fatal_error {
     print $q->p($message);
     print $q->end_html;
     die;
+}
+
+
+sub num_only {
+    # Take input and return a string that includes only
+    # characters that match the pattern we expect for 
+    # numbers.  In addition to digits, we allow plus and 
+    # minus signs, both period and comma (both could be 
+    # decimal separators depending on locale), and colon
+    # to allow for colon-separated sexagesimal coords. 
+    # Whitespace is also allowed. 
+
+    my $input = shift @_;
+    if (defined($input)) {
+	$input =~ s/[^\d+-.,:\s]//g;
+	return $input;
+    } else {
+	return "";
+    }
 }
