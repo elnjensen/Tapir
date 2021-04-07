@@ -5,7 +5,11 @@
 
 <link rel='stylesheet' href='https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css' />
 <script type='text/javascript' src='https://code.jquery.com/jquery-1.9.1.min.js' charset='utf-8'></script>
+<!--
 <script type='text/javascript' src='https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js' charset='utf-8'>
+-->
+<!-- Try a local copy of aladin source -->
+<script type='text/javascript' src='aladin-local.js' charset='utf-8'>
 </script>
 <script type='text/javascript' src='vizier_mirrors.js' charset='utf-8'></script>
 <!-- Functions for Aladin Lite finder interface. -->
@@ -397,7 +401,55 @@ async function setupAladin() {
     setupSimbad();
     setupFFI();
     setAladinHeight();
+
+    /* To work around an issue with popups sometimes
+       not working, allow them also to triggered on
+       mouse hover over an object, but only when the
+       Shift key is pressed.  First, we bind events 
+       to track whether Shift is up or down, and then 
+       we bind the hover event to the popups, checking
+       on the Shift key boolean.
+    */ 
+    $(document).keydown(function( event ) {
+	    if ( event.which == 16 ) {
+		shift_pressed = true;
+	    }
+	});
+    $(document).keyup(function( event ) {
+	    if ( event.which == 16 ) {
+		shift_pressed = false;
+	    }
+	});
+
+
+    // define function triggered when a source is hovered
+    aladin.on('objectHovered', function(object) {
+       // Do nothing unless Shift key is down and 
+       // we have an object:
+       if ((!object) || (!shift_pressed)) {
+	   return;
+       }
+       if (object.hasOwnProperty('catalog')) {
+	  if (object.catalog.name == 'TIC') {
+	     TICpopup(object);
+	  } else if (object.catalog.name.includes('Gaia')) {
+	     gaiaPopup(object);
+	  } else if (object.catalog.name.includes('Central star')) {
+             view = object.catalog.view;
+             view.popup.setText(object.popupDesc);
+             view.popup.setTitle(object.popupTitle);
+             view.popup.setSource(object);
+             view.popup.show();
+	  } else if (object.catalog.name.includes('Simbad')) {
+	     simbadPopup(object);
+	  }
+       }
+    });
+    
 }
+
+// Track whether or not the shift key is down: 
+var shift_pressed = false;
 
 // Call the above master function that sets everything up: 
 setupAladin();

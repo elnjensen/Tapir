@@ -699,7 +699,7 @@ function toggleElements(box) {
 function setupSimbad() {
     // Also add a Simbad layer option:
     hipsSimbad = A.catalogHiPS('https://axel.u-strasbg.fr/HiPSCatService/Simbad', 
-			       {onClick: 'showPopup', 
+			       {onClick: simbadPopup, 
 				name: 'Simbad',
 				color: colors.simbad,
 				sourceSize: 14,
@@ -712,6 +712,33 @@ function setupSimbad() {
     checkbox.checked = showSimbad;
     toggleElements(checkbox);
 }
+
+function simbadPopup(s) {
+    /* Function for showing a customized popup for Simbad sources; much
+       is copied out of the Aladin code for showPopup, but this allows
+       us to construct our own content for the popup, including a link
+       to the Simbad page for that source. 
+    */
+
+    var view = s.catalog.view;
+    var d = s.data;
+    simbad_url = 'https://simbad.harvard.edu/simbad/sim-id?Ident=' + 
+	encodeURIComponent(d.main_id)
+    view.popup.setTitle('<b>' + 
+			d.main_id + '</b><br/>');
+    var m = '<a href="' + simbad_url + '" target="_blank">Simbad</a>' +
+	'<br/><div class="aladin-marker-measurement">';
+    m += '<table>';
+    for (var key in s.data) {
+	m += '<tr><td>' + key + '</td><td>' + s.data[key] + '</td></tr>';
+    }
+    m += '</table>';
+    m += '</div>';
+    view.popup.setText(m);
+    view.popup.setSource(s);
+    view.popup.show();
+}
+
 
 function setupFFI() {
     // Add a TESS FFI image layer
