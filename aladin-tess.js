@@ -464,7 +464,8 @@ function setupGaia() {
 			    color: colors.gaiaBlends,
 			    onClick: gaiaPopup});
 
-    gaiaAll = A.catalogFromURL(vizierURL('I/345/gaia2', field_center, 
+    // EDR3 is: I/350/gaiaedr3  ; DR2 is: I/345/gaia2
+    gaiaAll = A.catalogFromURL(vizierURL('I/350/gaiaedr3', field_center, 
 					 radius_deg, extra_options), 
 			       {onClick: gaiaPopup,
 				name: 'All Gaia stars',
