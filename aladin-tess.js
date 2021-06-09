@@ -327,6 +327,7 @@ async function shiftCatalogTIC(sources) {
 	    // Make a note of the Gaia ID of this entry so we can
 	    // exclude it from the list of blending stars later:
 	    centralStar.gaia = sources[i].data.GAIA;
+	    centralStar.Tmag = sources[i].data.Tmag;
 	    // Most of the time this block won't run since i = 0;
 	    if (i > 0) {
 		alert("TIC entry matching entered name is not closest" + 
@@ -450,6 +451,15 @@ function TICpopup(s) {
    possibly contaminate the TESS detection.x */
 
 
+/* Since new Gaia data releases will keep coming out, make sure
+   to define some relevant variables together here, so we'll 
+   notice to change epoch if the catalog changes. 
+*/ 
+
+// EDR3 is: I/350/gaiaedr3  ; DR2 is: I/345/gaia2
+gaiaVizierCatalog = 'I/350/gaiaedr3';
+gaiaEpoch = 2016.0  // DR2 is 2015.5
+
 //  ---------- Gaia section: -------------
 function setupGaia() {
 
@@ -464,8 +474,7 @@ function setupGaia() {
 			    color: colors.gaiaBlends,
 			    onClick: gaiaPopup});
 
-    // EDR3 is: I/350/gaiaedr3  ; DR2 is: I/345/gaia2
-    gaiaAll = A.catalogFromURL(vizierURL('I/350/gaiaedr3', field_center, 
+    gaiaAll = A.catalogFromURL(vizierURL(gaiaVizierCatalog, field_center, 
 					 radius_deg, extra_options), 
 			       {onClick: gaiaPopup,
 				name: 'All Gaia stars',
@@ -519,10 +528,11 @@ async function shiftCatalogGaia(sources) {
 
     const current_epoch = currentEpoch();
     var neighbors = [];
+    var centralStarData = null;
     for (i=0; i < sources.length; i++) {
 	sources[i].data.i = i;
 	// Use epoch of coords to get time span:
-	span = current_epoch - 2015.5;
+	span = current_epoch - gaiaEpoch;
 	pmRA = parseFloat(sources[i].data.pmRA);
 	pmDE = parseFloat(sources[i].data.pmDE);
 	RAorig = parseFloat(sources[i].data.RA_ICRS);
@@ -558,6 +568,7 @@ async function shiftCatalogGaia(sources) {
 
 	var gmag = parseFloat(sources[i].data.Gmag);
 	var rmag = parseFloat(sources[i].data.RPmag);
+	var color = parseFloat(sources[i].data['BP-RP']);
 	// If we don't have Gaia mags, or don't have a central 
 	// Tmag to compare to, we can't check this. 
 	if (Tmag == '' || (isNaN(gmag) && isNaN(rmag))) {
@@ -567,19 +578,32 @@ async function shiftCatalogGaia(sources) {
 
 	var mag = null; // which mag we will actually use
 	var magOffset = null;
-	if (isNaN(rmag)) {
-	    // Fall back on G mag, different offset:
-	    mag = gmag;
+	if (isNaN(gmag)) {
+	    // Fall back on R mag, different offset:
+	    mag = rmag;
 	    magOffset = 1.0;
 	} else {
-	    mag = rmag;
+	    if (isNaN(color)) {
+		T_gaia = gmag - 0.43;
+	    } else {
+		// Calculate the approximate Gaia source T mag from the Gaia 
+		// photometry, following Eq. 1 of the TIC paper (Stassun et al. 
+		// 2019).
+		T_gaia = gmag - 0.00522555*color**3 + 0.0891337*color**2 - 
+		    0.633923*color + 0.0324473;
+	    }
+	    mag = T_gaia;
 	    magOffset = 0.5;
 	}
 	// Save this mag for possible neighbor recalculation later: 
-	sources[i].data.shiftedMag = (mag - magOffset).toPrecision(6);
-	if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
-	    (dist <= gaiaRadius) && 
-	    (sources[i].data.Source != centralStar.gaia)) {
+	sources[i].data.shiftedMag = (mag - magOffset).toFixed(3);
+	// Also store which mag we actually used for comparison:
+	sources[i].data.magUsed = mag.toFixed(3);
+	if (sources[i].data.Source == centralStar.gaia) {
+	    // Save this separately:
+	    centralStarData = sources[i];
+	} else if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
+		   (dist <= gaiaRadius)) {
 	    neighbors.push(sources[i]);
 	} 
     }
@@ -594,8 +618,19 @@ async function shiftCatalogGaia(sources) {
 	document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length;
 	document.getElementById('depth-input').value = parseFloat(depth);
     }
-    // After we update the labels, the height of the header may have changed slightly:
-    setAladinHeight();
+    // Create the link to make an AIJ apertures file of the blending stars:
+    neighbors_plus = neighbors;
+    if (centralStarData) {
+	neighbors_plus.unshift(centralStarData);
+    } else {
+	console.log("Did not match central star via Gaia in making AIJ apertures, will try to match by T mag.");
+    }
+    blob = createAIJApertures(neighbors);
+    blobURL = URL.createObjectURL(blob);
+    let aijLink = document.getElementById('aij-link');
+    aijLink.href = blobURL;
+    aijLink.innerHTML = "AIJ apertures";
+    aijLink.download = blob.name;
 }
 
 function changeGaiaNeighbors(depth) {
@@ -621,6 +656,93 @@ function changeGaiaNeighbors(depth) {
     gaiaBlends.addSources(neighbors);
     document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length;
 }    
+
+function toSexagesimal(num, prec, plus) {
+    /* Convert degrees to sexagesimal.  Adapted from Aladin 
+       code; use ":" instead of space, and keep leading zero
+       for all fields. 'prec' (precision) is number of decimal 
+       places to include on seconds. 
+    */ 
+
+    var sign = num < 0 ? '-' : (plus ? '+' : '');
+    var n = Math.abs(num);
+    var n1 = Math.floor(n);	// d
+    if (n1<10) n1 = '0' + n1;
+    var n2 = (n-n1)*60;		// M.d
+    var n3 = Math.floor(n2);// M
+    if (n3<10) n3 = '0' + n3;
+    var n4 = (n2-n3)*60;    // S.ddd
+    var n5 = Numbers.format(n4, prec);
+    if (n5<10) n5 = '0' + n5;
+    return sign+n1+':'+n3+':'+n5;
+}
+
+
+function createAIJApertures(sources) {
+    /* Take an input array of Gaia sources and create an in-memory
+       text file (using Blob) that is in the format used by 
+       AstroImageJ to mark apertures.  Returns the URL of the 
+       Blob object.
+    */
+
+    // Initialize array: 
+    var entries = [];
+    // Start with some comment strings.  Make it an array 
+    // so we can concat lines along with aperture lines. 
+    comments = ['# Aperture file for use in AstroImageJ\n'];
+    comments.push('# Target = TIC ' + tic_number + '\n');
+    today = new Date().toISOString().split('T')[0] + '\n';
+    comments.push('# RA and Dec are ICRS Gaia coordinates, proper motion applied to ' + today);
+    comments.push('# Ref Star: 0=target star, 1=ref star\n');
+    comments.push('# Centroid: 0=do not centroid, 1=centroid\n');
+    comments.push('# Magnitude is estimated T mag from Gaia G, based on formula in TIC paper.\n');
+    comments.push('# RA,      Dec, Ref Star, Centroid, Mag\n');
+    var mags = [];
+    var foundCentralStar = false;
+    for (i=0; i < sources.length; i++) {
+	const s = sources[i];
+	var coo = toSexagesimal(s.ra/15, 3, false) +
+	    ",  " + toSexagesimal(s.dec, 3, false);
+	var target;
+	// Is this the target star?  Check the Gaia ID, but also 
+	// double-check the magnitude in case the Gaia DR2 ID from
+	// the TIC has been re-assigned in eDR3 to a different star: 
+	if ((s.data.Source == centralStar.gaia) && 
+	    (Math.abs(parseFloat(s.data.magUsed) - centralStar.Tmag) < 0.2)) {
+	    target = 1;
+	    foundCentralStar = true;
+	} else {
+	    target = 0;
+	}
+	const line = coo + ", 0, " + target + ", " + s.data.magUsed + "\n";
+	entries.push(line);
+	mags.push(parseFloat(s.data.magUsed));
+    }
+    if (!foundCentralStar) {
+	// Look at the first handful of stars and see if one of them has a similar
+	// magnitude to the target star: 
+	for (i=0; i < Math.min(5, entries.length); i++) {
+	    if (Math.abs(mags[i] - centralStar.Tmag) < 0.1) {
+		// Mags match pretty closely, mark this as the 
+		// central star:
+		entries[i] = entries[i].replace(" 0, 0, ", " 0, 1, ");
+		console.log("Matched source " + i + " as central star for apertures, " +
+			    "T = " + centralStar.Tmag + ", T(gaia) = " + mags[i]);
+		foundCentralStar = true;
+		break;
+	    }
+	}
+    }
+    if (!foundCentralStar) {
+	console.log("Did not find a match for central star, " +
+		    "none marked in AIJ apertures file."); 
+    }
+    let blob = new Blob(comments.concat(entries), {type: 'text/plain;charset=UTF-8'});
+    blob.lastModifiedDate = new Date();
+    blob.name = 'gaia_stars_TIC' + tic_number + '.radec';
+    return blob;
+}
+
 
 function gaiaPopup(s) {
     /* Function for showing a customized popup for Gaia sources; much
@@ -659,12 +781,16 @@ function gaiaPopup(s) {
 
 
 function toggleElements(box) {
-    var item, overlay, color;
+    var item, overlay, color, link;
+
+    link = null; // Most items don't have links
 
     if (box.id === 'gaia') {
 	item = gaiaBlends;
 	overlay = Gaia_boundary;
 	color = colors.gaia;
+	// Apertures link is toggled along with blends symbol: 
+	link = document.getElementById('aij-link-span');
     } else if (box.id == 'simbad') {
 	item = hipsSimbad;
 	overlay = '';
@@ -689,10 +815,12 @@ function toggleElements(box) {
 	item.show();
 	if (overlay) {overlay.show()};
 	legend.style.stroke = color;
+	if (link) {link.style.display="inline"};
     } else {
 	item.hide();
 	if (overlay) {overlay.hide()};
 	legend.style.stroke = "none";
+	if (link) {link.style.display="none"};
     }
 }
 
