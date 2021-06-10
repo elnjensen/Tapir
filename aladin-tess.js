@@ -528,6 +528,8 @@ async function shiftCatalogGaia(sources) {
 
     const current_epoch = currentEpoch();
     var neighbors = [];
+    var neighborDistances = [];
+    let lastDistance = -1;
     var centralStarData = null;
     for (i=0; i < sources.length; i++) {
 	sources[i].data.i = i;
@@ -604,9 +606,33 @@ async function shiftCatalogGaia(sources) {
 	    centralStarData = sources[i];
 	} else if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
 		   (dist <= gaiaRadius)) {
-	    neighbors.push(sources[i]);
+	    // We have a neighbor star - add it to the list, but 
+	    // keep the list in order by angular distance from the 
+	    // center.  Most of the time this just means pushing it
+	    // onto the end of the list, but occasionally we'll need
+	    // to search from the end of the list backward to find
+	    // the right location to add it in. 
+	    j = neighbors.length - 1; // last index of array
+	    if (dist >= lastDistance) {
+		// Farthest source yet, just add to the end. Since 
+		// the initial value of lastDistance is negative, 
+		// this will always run for the first source. 
+		neighbors.push(sources[i]);
+		lastDistance = dist;
+		neighborDistances.push(dist);
+	    } else {
+		// Find the right place to insert; here we do not
+		// update lastDistance, so that it stays as distance
+		// at end of array. 
+		while ((j >= 0) && (neighborDistances[j] > dist)) {
+		    j--;
+		}
+		neighbors.splice(j + 1, 0, sources[i]);
+		neighborDistances.splice(j + 1, 0, dist);
+	    }
 	} 
     }
+
     gaiaBlends.addSources(neighbors);
     // Now add the circle with the field for the Gaia blends:
     Gaia_boundary.add(A.circle(ra_center, dec_center, 
