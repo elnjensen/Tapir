@@ -508,6 +508,38 @@ function setupGaia() {
     }
 }
 
+function TfromGaia(source) {
+    /* Estimate TESS T mag from data in Gaia entry
+       following the prescription from the TIC v8 
+       paper.  Falls back on r mag if G is undefined. 
+       May return a NaN value if not enough 
+       photometry is present in the source entry 
+       passed in.
+    */
+
+    let gmag = parseFloat(source.data.Gmag);
+    let rmag = parseFloat(source.data.RPmag);
+    let color = parseFloat(source.data['BP-RP']);
+
+    let mag = null; // which mag we will actually use
+    if (isNaN(gmag)) {
+	// Fall back on R mag, different offset:
+	mag = rmag;
+    } else {
+	if (isNaN(color)) {
+	    T_gaia = gmag - 0.43;
+	} else {
+	    // Calculate the approximate Gaia source T mag from the Gaia 
+	    // photometry, following Eq. 1 of the TIC paper (Stassun et al. 
+	    // 2019).
+	    T_gaia = gmag - 0.00522555*color**3 + 0.0891337*color**2 - 
+		0.633923*color + 0.0324473;
+	}
+	mag = T_gaia;
+    }
+    return mag;
+}
+
 async function shiftCatalogGaia(sources) {
     /* Callback function to process the Gaia catalog returned by a
        Vizier query.  Take a catalog of sources as input, and shift
@@ -570,7 +602,6 @@ async function shiftCatalogGaia(sources) {
 
 	var gmag = parseFloat(sources[i].data.Gmag);
 	var rmag = parseFloat(sources[i].data.RPmag);
-	var color = parseFloat(sources[i].data['BP-RP']);
 	// If we don't have Gaia mags, or don't have a central 
 	// Tmag to compare to, we can't check this. 
 	if (Tmag == '' || (isNaN(gmag) && isNaN(rmag))) {
@@ -578,23 +609,12 @@ async function shiftCatalogGaia(sources) {
 	    continue;
 	}
 
-	var mag = null; // which mag we will actually use
+	var mag = TfromGaia(sources[i]); // which mag we will actually use
 	var magOffset = null;
 	if (isNaN(gmag)) {
 	    // Fall back on R mag, different offset:
-	    mag = rmag;
 	    magOffset = 1.0;
 	} else {
-	    if (isNaN(color)) {
-		T_gaia = gmag - 0.43;
-	    } else {
-		// Calculate the approximate Gaia source T mag from the Gaia 
-		// photometry, following Eq. 1 of the TIC paper (Stassun et al. 
-		// 2019).
-		T_gaia = gmag - 0.00522555*color**3 + 0.0891337*color**2 - 
-		    0.633923*color + 0.0324473;
-	    }
-	    mag = T_gaia;
 	    magOffset = 0.5;
 	}
 	// Save this mag for possible neighbor recalculation later: 
@@ -638,20 +658,24 @@ async function shiftCatalogGaia(sources) {
     Gaia_boundary.add(A.circle(ra_center, dec_center, 
 			       gaiaRadius, gaia_options));
     console.log("Done with Gaia catalog.");
-    // Update the label with number of sources: 
-    document.getElementById('gaia-N-sources').innerHTML = sources.length;
-    if (depth) {
-	document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length;
-	document.getElementById('depth-input').value = parseFloat(depth);
-    }
     // Create the link to make an AIJ apertures file of the blending stars:
     neighbors_plus = neighbors;
     if (centralStarData) {
+	numNeighbors = neighbors.length;
 	neighbors_plus.unshift(centralStarData);
     } else {
 	console.log("Did not match central star via Gaia in making AIJ apertures, will try to match by T mag.");
+	// Central star is almost certainly included in the neighbors list, so reduce
+	// label count by one. 
+	numNeighbors = neighbors.length - 1;
     }
-    blob = createAIJApertures(neighbors);
+    // Update the labels with number of sources: 
+    document.getElementById('gaia-N-sources').innerHTML = sources.length;
+    if (depth) {
+	document.getElementById('gaia-blends-N-sources').innerHTML = numNeighbors;
+	document.getElementById('depth-input').value = parseFloat(depth);
+    }
+    blob = createAIJApertures(neighbors_plus);
     blobURL = URL.createObjectURL(blob);
     let aijLink = document.getElementById('aij-link');
     aijLink.href = blobURL;
@@ -781,13 +805,22 @@ function gaiaPopup(s) {
     var view = s.catalog.view;
     var d = s.data;
     g = d.Source; // Gaia ID, used to index some hashes
-    view.popup.setTitle('<b>TIC ' + TIC_vals[g] + '</b><br/><br/>');
+    Tmag = Tmag_vals[g];
+    deltaTmag = deltaT_vals[g];
+    extraTicText = '';
+    if (!Tmag) { // No match on Gaia ID, estimate T:
+	TGaia = TfromGaia(s)
+	Tmag = TGaia.toFixed(3);
+	deltaTmag = (TGaia - centralStar.Tmag).toFixed(3);
+	extraTicText += ' (new in eDR3 or Gaia ID changed)';
+    }
+    view.popup.setTitle('<b>TIC ' + TIC_vals[g] + extraTicText + '</b><br/><br/>');
     var m = '<div class="equation">';
     // m += '<div><span>T</span> = <span>' + Tmag_vals[g] + '</span></div>';
     // m += '<div><span>&Delta;T</span> = <span>' + deltaT_vals[g] + '</span></div>';
     // m += '<div><span>r</span> = <span>' + d._r + '</span></div>';
-    m += '<div>T = ' + Tmag_vals[g] + '</div>';
-    m += '<div>&Delta;T = ' + deltaT_vals[g] + '</div>';
+    m += '<div>T = ' + Tmag + '</div>';
+    m += '<div>&Delta;T = ' + deltaTmag + '</div>';
     m += '<div>r = ' + d._r + '</div>';
     m += '</div>'
     m += '<br/><div class="aladin-marker-measurement">';
