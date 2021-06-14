@@ -621,10 +621,7 @@ async function shiftCatalogGaia(sources) {
 	sources[i].data.shiftedMag = (mag - magOffset).toFixed(3);
 	// Also store which mag we actually used for comparison:
 	sources[i].data.magUsed = mag.toFixed(3);
-	if (sources[i].data.Source == centralStar.gaia) {
-	    // Save this separately:
-	    centralStarData = sources[i];
-	} else if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
+	if ((mag <= (Tmag + depthDeltaMag + magOffset)) && 
 		   (dist <= gaiaRadius)) {
 	    // We have a neighbor star - add it to the list, but 
 	    // keep the list in order by angular distance from the 
@@ -632,6 +629,22 @@ async function shiftCatalogGaia(sources) {
 	    // onto the end of the list, but occasionally we'll need
 	    // to search from the end of the list backward to find
 	    // the right location to add it in. 
+
+	    // If the Gaia ID matches that from the TIC, *and* the magnitudes
+	    // are relatively close, assume that this is the central star. The 
+	    // latter condition is to double-check against a reassignment of the DR2 
+	    // Gaia ID (from the TIC) to a different star in eDR3.  This isn't
+	    // foolproof but should catch some cases (if they exist) of that ID
+	    // getting split off to a much fainter neighbor. 
+	    if ((sources[i].data.Source == centralStar.gaia) && 
+		(Math.abs(mag - centralStar.Tmag) < 0.2)) {
+		// Save this separately:
+		sources[i].isCentralStar = true;
+		centralStarData = sources[i];
+		centralStarIndex = i;
+	    } else {
+		sources[i].isCentralStar = false;
+	    }
 	    j = neighbors.length - 1; // last index of array
 	    if (dist >= lastDistance) {
 		// Farthest source yet, just add to the end. Since 
@@ -653,29 +666,53 @@ async function shiftCatalogGaia(sources) {
 	} 
     }
 
-    gaiaBlends.addSources(neighbors);
+    if (!centralStarData) {
+	// Look at the first handful of stars and see if one of them has a similar
+	// magnitude to the target star: 
+	console.log("Did not match central star via Gaia ID, will try to match by T mag.");
+	for (i=0; i < Math.min(5, neighbors.length); i++) {
+	    currentMag = parseFloat(neighbors[i].data.magUsed);
+	    if (Math.abs(currentMag - centralStar.Tmag) < 0.1) {
+		// Mags match pretty closely, mark this as the 
+		// central star:
+		console.log("Matched neighbor source " + i + " as central star, " +
+			    "T = " + centralStar.Tmag + ", T(gaia) = " + currentMag);
+		//   Pick up here - need to pop this out of the list (?) or maybe just
+		// combine with code below that adds central star back in.  Make sure
+		// counting code is now correct; fix code in apertures routine to use 
+		// the right fields; make sure code above is flagging star correctly and 
+		// also maybe checking the mag. 
+		neighbors[i].isCentralStar = true;
+		centralStarData = sources[i];
+		centralStarIndex = i;
+		break;
+	    }
+	}
+    }
+
+    // Quick way to make a shallow copy we can modify: 
+    neighborsOnly = neighbors.map((x) => x);
+
+    if (centralStarData) {
+	// Don't want to include central star in neighbor symbols, so pop
+	// it out if found: 
+	neighborsOnly.splice(centralStarIndex, 1);
+    }
+    gaiaBlends.addSources(neighborsOnly);
     // Now add the circle with the field for the Gaia blends:
     Gaia_boundary.add(A.circle(ra_center, dec_center, 
 			       gaiaRadius, gaia_options));
     console.log("Done with Gaia catalog.");
     // Create the link to make an AIJ apertures file of the blending stars:
-    neighbors_plus = neighbors;
-    if (centralStarData) {
-	numNeighbors = neighbors.length;
-	neighbors_plus.unshift(centralStarData);
-    } else {
-	console.log("Did not match central star via Gaia in making AIJ apertures, will try to match by T mag.");
-	// Central star is almost certainly included in the neighbors list, so reduce
-	// label count by one. 
-	numNeighbors = neighbors.length - 1;
-    }
     // Update the labels with number of sources: 
     document.getElementById('gaia-N-sources').innerHTML = sources.length;
     if (depth) {
-	document.getElementById('gaia-blends-N-sources').innerHTML = numNeighbors;
+	// Central star is almost certainly included in the neighbors list, even if we 
+	// didn't find it yet, so reduce label count by one:
+	document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length - 1;
 	document.getElementById('depth-input').value = parseFloat(depth);
     }
-    blob = createAIJApertures(neighbors_plus);
+    blob = createAIJApertures(neighbors);
     blobURL = URL.createObjectURL(blob);
     let aijLink = document.getElementById('aij-link');
     aijLink.href = blobURL;
@@ -747,7 +784,7 @@ function createAIJApertures(sources) {
     comments.push('# Centroid: 0=do not centroid, 1=centroid\n');
     comments.push('# Magnitude is estimated T mag from Gaia G, based on formula in TIC paper.\n');
     comments.push('# RA,      Dec, Ref Star, Centroid, Mag\n');
-    var mags = [];
+
     var foundCentralStar = false;
     for (i=0; i < sources.length; i++) {
 	const s = sources[i];
@@ -757,8 +794,7 @@ function createAIJApertures(sources) {
 	// Is this the target star?  Check the Gaia ID, but also 
 	// double-check the magnitude in case the Gaia DR2 ID from
 	// the TIC has been re-assigned in eDR3 to a different star: 
-	if ((s.data.Source == centralStar.gaia) && 
-	    (Math.abs(parseFloat(s.data.magUsed) - centralStar.Tmag) < 0.2)) {
+	if (s.isCentralStar) {
 	    target = 1;
 	    foundCentralStar = true;
 	} else {
@@ -766,22 +802,6 @@ function createAIJApertures(sources) {
 	}
 	const line = coo + ", 0, " + target + ", " + s.data.magUsed + "\n";
 	entries.push(line);
-	mags.push(parseFloat(s.data.magUsed));
-    }
-    if (!foundCentralStar) {
-	// Look at the first handful of stars and see if one of them has a similar
-	// magnitude to the target star: 
-	for (i=0; i < Math.min(5, entries.length); i++) {
-	    if (Math.abs(mags[i] - centralStar.Tmag) < 0.1) {
-		// Mags match pretty closely, mark this as the 
-		// central star:
-		entries[i] = entries[i].replace(" 0, 0, ", " 0, 1, ");
-		console.log("Matched source " + i + " as central star for apertures, " +
-			    "T = " + centralStar.Tmag + ", T(gaia) = " + mags[i]);
-		foundCentralStar = true;
-		break;
-	    }
-	}
     }
     if (!foundCentralStar) {
 	console.log("Did not find a match for central star, " +
