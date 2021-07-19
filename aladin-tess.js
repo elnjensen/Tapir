@@ -106,16 +106,20 @@ async function resolveCoords(target) {
 	// passed had a trailing .01, .02, etc., remove it before
 	// passing to Sesame since that won't be resolved in the TIC. 
 	let matchname = target.replace(/^(TIC\s*\d+)\.\d+$/,'$1');
-	Sesame.getTargetRADec(matchname,
-			      function(d) {
-				  ra_center=d.ra; 
-				  dec_center=d.dec; 
-				  ra_string = d.ra;
-				  have_center_coords=true; 
-				  console.log('Resolved '+matchname+': '+d.ra+', '+d.dec)
-				      }, 
-			      function(){alert('Could not resolve '+matchname+' into coordinates.')}
-			      );
+	Sesame.resolve(matchname,
+		       function(data) {
+			   d = data.Target.Resolver;
+			   ra_center=d.jradeg; 
+			   dec_center=d.jdedeg; 
+			   ra_string = d.jradeg;
+			   have_center_coords=true; 
+			   console.log('Resolved '+matchname+': '+d.jpos);
+			   if (d.pm) {
+			       console.log('Proper motion is pmra='+d.pm.pmRA+', pmdec='+d.pm.pmDE);
+			   };
+			       }, 
+		       function(){alert('Could not resolve '+matchname+' into coordinates.')}
+		       );
     }
 }
 
@@ -458,7 +462,7 @@ function TICpopup(s) {
 
 // EDR3 is: I/350/gaiaedr3  ; DR2 is: I/345/gaia2
 gaiaVizierCatalog = 'I/350/gaiaedr3';
-gaiaEpoch = 2016.0  // DR2 is 2015.5
+gaiaEpoch = 2016.0;  // DR2 is 2015.5
 
 //  ---------- Gaia section: -------------
 function setupGaia() {
@@ -672,19 +676,19 @@ async function shiftCatalogGaia(sources) {
 	console.log("Did not match central star via Gaia ID, will try to match by T mag.");
 	for (i=0; i < Math.min(5, neighbors.length); i++) {
 	    currentMag = parseFloat(neighbors[i].data.magUsed);
-	    if (Math.abs(currentMag - centralStar.Tmag) < 0.1) {
+	    if (Math.abs(currentMag - centralStar.Tmag) < 0.7) {
 		// Mags match pretty closely, mark this as the 
 		// central star:
 		console.log("Matched neighbor source " + i + " as central star, " +
 			    "T = " + centralStar.Tmag + ", T(gaia) = " + currentMag);
-		//   Pick up here - need to pop this out of the list (?) or maybe just
-		// combine with code below that adds central star back in.  Make sure
-		// counting code is now correct; fix code in apertures routine to use 
-		// the right fields; make sure code above is flagging star correctly and 
-		// also maybe checking the mag. 
 		neighbors[i].isCentralStar = true;
 		centralStarData = sources[i];
 		centralStarIndex = i;
+		// Save the Gaia ID so we can ID this star later; note that 
+		// this might override the DR2 Gaia ID saved from the TIC with 
+		// an eDR3 ID, but that allows us to match it unambiguously later
+		// if we are recalculating the neighbor list. 
+		centralStar.gaia = sources[i].data.Source;
 		break;
 	    }
 	}
@@ -709,9 +713,17 @@ async function shiftCatalogGaia(sources) {
     if (depth) {
 	// Central star is almost certainly included in the neighbors list, even if we 
 	// didn't find it yet, so reduce label count by one:
-	document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length - 1;
+	if (neighbors.length > 0) {
+	    document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length - 1;
+	}
 	document.getElementById('depth-input').value = parseFloat(depth);
     }
+    // Also update the AIJ apertures list
+    updateAIJApertures(neighbors);
+}
+
+function updateAIJApertures(neighbors) {
+    /* Make the list of AIJ apertures, and update the link accordingly. */ 
     blob = createAIJApertures(neighbors);
     blobURL = URL.createObjectURL(blob);
     let aijLink = document.getElementById('aij-link');
@@ -729,19 +741,28 @@ function changeGaiaNeighbors(depth) {
     */
 
     const magThreshold = Tmag - 2.5*Math.log10(depth/1000);
+    // We will keep two lists; one of the possibly-blending neighbors
+    // only, and one that also includes the central star.  The latter
+    // is needed for the AIJ apertures list.
     var neighbors = [];
+    var neighbors_plus = [];
     let s = gaiaAll.sources;
     for (i = 0; i < s.length; i++) {
 	if ((s[i].data.shiftedMag) && 
-	    (s[i].data.Source != centralStar.gaia) &&
 	    (s[i].data.shiftedMag <= magThreshold) && 
 	    (s[i].data.r_deg <= gaiaRadius)) {
-	    neighbors.push(s[i]);
+	    neighbors_plus.push(s[i]);
+	    // If it's not the central star, save in neighbors list: 
+	    if (s[i].data.Source != centralStar.gaia) {
+		neighbors.push(s[i]);
+	    }
 	} 
     }
     gaiaBlends.removeAll();
     gaiaBlends.addSources(neighbors);
     document.getElementById('gaia-blends-N-sources').innerHTML = neighbors.length;
+    // Also update the AIJ apertures list, including central star: 
+    updateAIJApertures(neighbors_plus);
 }    
 
 function toSexagesimal(num, prec, plus) {
