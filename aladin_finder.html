@@ -24,8 +24,8 @@ function setCoords() {
     // Don't try to match unless there's a non-whitespace char: 
     if (target.match(/\S/)) {
 	clearTimeout(timeout);
-	// Wait 1/3 second for typing to stop:
-	timeout = setTimeout(resolveCoords, 333);
+	// Wait 2/3 second for typing to stop:
+	timeout = setTimeout(resolveCoords, 667);
     }
 }
 
