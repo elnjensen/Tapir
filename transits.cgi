@@ -525,14 +525,11 @@ input[type=submit] {
 
 <p style="color:purple"> 
 <em> 
-Latest update (Dec. 2020): in addition to the links to the Sky-Map
-    finding charts, I have added a new interactive view for each target based on
-Aladin Lite with the option to overlay <a
-href="https://astro.swarthmore.edu/HiPS/TESS/">TESS images</a>; check
-them out and  <a
-href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
->let me know</a> what you think.  There is also a <a
-href="aladin_finder.html">standalone page</a> for these.
+Latest update (Sep. 2021): The database of transiting planets used below is
+    currently slightly behind the NASA list and does not include transiting
+    planets added to the NASA Exoplanet Archive since April 2021.  I
+    need to find time to update the code to deal with their new table
+    format. I hope to do that soon. (The TOI list is up-to-date.) 
 </em>
 </p>
 
