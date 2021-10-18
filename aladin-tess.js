@@ -645,7 +645,6 @@ async function shiftCatalogGaia(sources) {
 		// Save this separately:
 		sources[i].isCentralStar = true;
 		centralStarData = sources[i];
-		centralStarIndex = i;
 	    } else {
 		sources[i].isCentralStar = false;
 	    }
@@ -667,6 +666,12 @@ async function shiftCatalogGaia(sources) {
 		neighbors.splice(j + 1, 0, sources[i]);
 		neighborDistances.splice(j + 1, 0, dist);
 	    }
+	    if (sources[i].isCentralStar) {
+		// Save the index of central star in the 
+		// neighbors array:
+		centralStarIndex = j+1;
+		neighbors[centralStarIndex].isCentralStar = true;
+	    }
 	} 
     }
 
@@ -683,6 +688,8 @@ async function shiftCatalogGaia(sources) {
 			    "T = " + centralStar.Tmag + ", T(gaia) = " + currentMag);
 		neighbors[i].isCentralStar = true;
 		centralStarData = sources[i];
+		// Save the index of the central star; note that this is
+		// an index  into the *neighbors* array.
 		centralStarIndex = i;
 		// Save the Gaia ID so we can ID this star later; note that 
 		// this might override the DR2 Gaia ID saved from the TIC with 
