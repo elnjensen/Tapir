@@ -238,7 +238,7 @@ our %observatories_australia = (
 
 	   "Mt. Stromlo Observatory" => {
 	       latitude => -35.320650,
-	       longitude => -210.975667,
+	       longitude => 149.0081,
 	       timezone_integer => -10,
 	       timezone => 'Australia/Sydney',
 	   },
@@ -250,8 +250,8 @@ our %observatories_australia = (
 	   },
 
 	   "Anglo-Australian Observatory / Siding Spring" => {
-	       latitude => -31.277039,
-	       longitude => -210.933914,
+	       latitude => -31.274,
+	       longitude => 149.069,
 	       timezone_integer => -10,
 	       timezone => 'Australia/Sydney',
 	   },
