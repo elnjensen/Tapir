@@ -320,9 +320,11 @@ sub estimate_duration {
     # Mallen-Ornelas 2003
 
     my $a_over_r = '';
-    if (($p->{'pl_orbsmax'} ne '') and 
-	($p->{'mst_rad'} ne '')) {
-	$a_over_r = ($p->{'pl_orbsmax'} * AU) / ($p->{'mst_rad'}
+    # Check 'defined' first to avoid warnings about uninitialized
+    # values: 
+    if ((defined $p->{'pl_orbsmax'}) and ($p->{'pl_orbsmax'} ne '') and 
+	(defined $p->{'mst_rad'}) and ($p->{'mst_rad'} ne '')) {
+	$a_over_r = ($p->{'pl_orbsmax'} * AU) / ($p->{'st_rad'}
 						  * R_sun); 
     } else {
 	# Not quite the same for non-zero e, since this is defined
@@ -336,8 +338,8 @@ sub estimate_duration {
     # Even though the above field is defined, sometimes it's not
     # filled in even though r_planet and r_star are both given: 
     if ($rplanet_over_rstar eq '') {
-	if (($p->{'pl_rads'} ne '') and 
-	    ($p->{'mst_rad'} ne '')) {
+	if ((defined $p->{'pl_rads'}) and ($p->{'pl_rads'} ne '') and 
+	    (defined $p->{'mst_rad'}) and ($p->{'mst_rad'} ne '')) {
 	    $rplanet_over_rstar = $p->{'pl_rads'} / $p->{'mst_rad'};
 	}
     }
