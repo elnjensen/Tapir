@@ -139,25 +139,13 @@ if ($DEBUG) {
     print STDERR "Found $n_good usable entries out of $n_total total.\n";
 }
 
-
-# Now we have the good entries in order.  First we make a list of
-# consecutive ones for the same system, then of those, pick the one
-# that gives the smallest transit-time uncertainty. 
- 
-my @p_list = ();
-
-
 # Header for the CSV file with the names of each field: 
 my @header = ("name","RA","Dec","vmag","epoch","epoch_uncertainty",
 	      "period","period_uncertainty",
-	      "duration","comments","depth");
+	      "duration","comments","depth","rank");
 
 # Output will be an array of array references; start with the header: 
 my @output_lines = (\@header);
-
-# $i is our counter variable for the loop, but note that it is
-# incremented within the loop body to group together like-named
-# entries. 
 
 PLANETS:
 foreach $p (@good_entries) {
@@ -184,12 +172,6 @@ foreach $p (@good_entries) {
     $p->{'period_err'} = $period_err;
     $p->{'midpoint_err'} = $midpoint_err;
 
-    # Now we have the best values for each entry; just a bit more
-    # processing and we can print them out. 
-
-    # Some entries that have good periods are missing duration.  See
-    # if we can fill that in. 
-
     # Get V magnitude or an alternate:
     if ($p->{'sy_vmag'} ne '') {
 	$V = $p->{'sy_vmag'};
@@ -202,9 +184,10 @@ foreach $p (@good_entries) {
     }
 
 
+    # Some entries that have good periods are missing duration.  See
+    # if we can fill that in. 
+
     if ($p->{'pl_trandur'} eq '') {
-	# Try again, now with estimating duration from other
-	# parameters. 
 	my ($duration, $status, $comment) = estimate_duration($p);
 	if ($status) {
 	    $p->{'pl_trandur'} = $duration;
@@ -221,7 +204,6 @@ foreach $p (@good_entries) {
     # Sometimes no depth is given - try to estimate depth from planet
     # and stellar radii:
     if ( $p->{'pl_trandep'} eq '' ) {
-	# 
 	if ($DEBUG) {
 	    print STDERR "No depth given for $p->{'pl_name'}, estimating.\n";
 	}
@@ -269,6 +251,7 @@ foreach $p (@good_entries) {
 	$duration_hours,
 	$p->{'comment'}, 
 	$depth_ppt_string,
+	$p->{'rank'}, 
 	);
 
     push(@output_lines, \@line);
@@ -279,31 +262,6 @@ my $status = Text::CSV::csv(in => \@output_lines, out => *STDOUT);
 
 
 # --- End of main program, just subroutines below here. 
-
-
-# Note that I wrote this but then decided not to use it; it ends up
-# picking some entries from the Exoplanet Archive that list parameters
-# to very high apparent precision but don't quote uncertainties.  We
-# don't want to privilege those over ones that actually give
-# uncertainties.  Leaving it here in case it's useful at some point. 
-
-sub estimate_error {
-    my ($n) = @_;
-
-    # Find the number of digits after the decimal place.
-    # First we match that part of the string: 
-    $n =~ m/\.(\d+)$/; 
-    # Then find number of characters in the matched string: 
-    my $count = length($1); 
-
-    # Trap unexpected patterns: 
-    if ($count ==0) {
-	die "Got an unexpected string in estimate_error: $n";
-    }
-    # Error is assumed to be in that decimal place:
-    my $err = 5 * 10**(-1 * $count); 
-    return $err;
-}
 
 sub estimate_duration {
 
