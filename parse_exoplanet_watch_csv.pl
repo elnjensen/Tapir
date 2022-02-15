@@ -230,7 +230,7 @@ foreach $p (@good_entries) {
 	$depth_ppt_string = sprintf('%0.1f', $depth_ppt);
     }
 
-    $duration_hours = sprintf('%0.2f', 24. * $p->{'pl_trandur'});
+    $duration_hours = sprintf('%0.2f', $p->{'pl_trandur'});
     
     # RA and Dec strings use hms and dms, change to colons for those
     # in between, strip trailing 's': 
@@ -264,6 +264,10 @@ my $status = Text::CSV::csv(in => \@output_lines, out => *STDOUT);
 # --- End of main program, just subroutines below here. 
 
 sub estimate_duration {
+
+# Estimate transit duration using other orbit parameters. Assumes
+# input orbital period is in days, but converts returned 
+# duration to hours. 
 
 # Still to be tweaked - was a block of code in main loop. 
 # Check for 'next' or 'die' to be sure we return errors instead of
@@ -345,7 +349,8 @@ sub estimate_duration {
 	undef $duration; 
 	return ($duration, $status, $comment); 
     }
-    $duration = ($p->{'pl_orbper'} / ($a_over_r * pi))
+    # Calculate duration in hours, assuming period is in days: 
+    $duration = (24 * $p->{'pl_orbper'} / ($a_over_r * pi))
 	* sqrt($sqrt_term); 
     $comment = "Duration estimated. "; 
     $status = 1; 
