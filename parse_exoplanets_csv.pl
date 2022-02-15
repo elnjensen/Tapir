@@ -2,7 +2,7 @@
 
 # Script to parse the CSV file of exoplanets from exoplanets.org.
 
-# Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more

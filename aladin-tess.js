@@ -5,7 +5,7 @@
    that file.  Placing them in a separate file here allows browsers to
    cache this part of the code, reducing bandwidth needed.
 
-  Copyright 2012-2020 Eric Jensen, ejensen1@swarthmore.edu.
+  Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
  
   This file is part of the Tapir package, a set of (primarily)
   web-based tools for planning astronomical observations.  For more
