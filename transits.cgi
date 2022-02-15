@@ -58,6 +58,11 @@ my $n_planets_tess = `wc -l toi_targets.csv`;
 $n_planets_tess =~ s/^\s*(\d+) .*$/$1/;
 $n_planets_tess -= 1;
 
+# Same for Exoplanet Watch
+my $n_planets_exowatch = `wc -l exoplanet_watch_targets.csv`;
+$n_planets_exowatch =~ s/^\s*(\d+) .*$/$1/;
+$n_planets_exowatch -= 1;
+
 
 # Declare the settings variables that we'll use:
 my ($observatory_string, $observatory_latitude, $observatory_longitude,
@@ -575,6 +580,11 @@ Checked
   </div>
  </div>
 </div>
+<br/>
+<INPUT TYPE="radio" NAME="single_object" VALUE="3" onclick="show_hide(this.value,'1','ephem_block')"
+/> Exoplanet Watch targets ($n_planets_exowatch planets; <a
+				    href="exoplanet_watch_targets.csv">CSV
+			     file</a>)
 <br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="1" onclick="show_hide(this.value,'1','ephem_block')"
 /> Single object
