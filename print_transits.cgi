@@ -317,12 +317,17 @@ if ((not defined $single_object) or ($single_object eq "")) {
 # The 'single_object' flag is overloaded to possibly indicate
 # alternate target lists: 
 my $tess = 0;
+my $exowatch = 0;
 
 # Flag for doing TOIs instead of known planets: 
 if ($single_object == 2) {
     $target_file = 'toi_targets.csv';
 #    $template_filename = 'target_table.tmpl';  # may change this
     $tess = 1;
+} elsif ($single_object == 3) {
+    $target_file = 'exoplanet_watch_targets.csv';
+#    $template_filename = 'target_table.tmpl';  # may change this
+    $exowatch = 1;
 }
 
 # Whether to show the ephemeris data:
