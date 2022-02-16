@@ -326,7 +326,7 @@ if ($single_object == 2) {
     $tess = 1;
 } elsif ($single_object == 3) {
     $target_file = 'exoplanet_watch_targets.csv';
-#    $template_filename = 'target_table.tmpl';  # may change this
+    $template_filename = 'target_table_exowatch.tmpl'; 
     $exowatch = 1;
 }
 

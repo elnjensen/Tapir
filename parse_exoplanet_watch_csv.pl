@@ -142,7 +142,7 @@ if ($DEBUG) {
 # Header for the CSV file with the names of each field: 
 my @header = ("name","RA","Dec","vmag","epoch","epoch_uncertainty",
 	      "period","period_uncertainty",
-	      "duration","comments","depth","rank");
+	      "duration","comments","depth","priority");
 
 # Output will be an array of array references; start with the header: 
 my @output_lines = (\@header);
