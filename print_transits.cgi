@@ -907,7 +907,7 @@ foreach my $target_ref (@lines) {
 
   # Likewise we assign a placeholder priority for the non-TESS
   # targets: 
-  if (not $tess) {
+  if (not ($tess or $exowatch)) {
       $target_ref->{priority} = 1;
   }
 
@@ -2159,9 +2159,9 @@ sub get_eclipses {
 
         $eclipse{single_object} = $single_object;
         $eclipse{tess} = $tess;
+        $eclipse{priority} = $param_ref->{"priority"};
         if ($tess) {
            $eclipse{disposition} = $param_ref->{"disposition"};
-           $eclipse{priority} = $param_ref->{"priority"};
            $eclipse{toi} = $param_ref->{"TOI"};
         }
 

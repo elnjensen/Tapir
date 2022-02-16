@@ -77,28 +77,19 @@ Extra stylesheet below modifies the default dataTables one in a few --
           stateDuration: 0,
           columnDefs: [
                          { "orderSequence": [ "desc", "asc" ], 
-			   "targets": [ 6, 7, 12, 13 ] },
+			   "targets": [ 6, 7, 12 ] },
 			 /* These control the order in which columns get hidden */ 
 			 /* on narrower screens.  Lower priorities are hidden first. */ 
 			 /* Date, Name, V, % obs */
      { responsivePriority: 1, targets: [0,1,2,7] },
 			 /* Start/end, Duration, BJD, Elev., Depth */
-     { responsivePriority: 2, targets: [3,4,5,6,12] },
+     { responsivePriority: 2, targets: [3,4,5,6,12,13] },
 			 /* RA/Dec, Period */
      { responsivePriority: 3, targets: [10,11] },
 			 /* Azimuth, HA */ 
      { responsivePriority: 10, targets: [8, 9] },
-<TMPL_IF NAME="tess">
-			 /* Comments */ 
-     { responsivePriority: 7, targets: [15] },
-			 /* Priority, disposition */ 
-     { responsivePriority: 8, targets: [13, 14] },
-<TMPL_ELSE>
 			 /* Comments */ 
      { responsivePriority: 7, targets: [14] },
-			 /* Rank */ 
-     { responsivePriority: 8, targets: [13] },
-</TMPL_IF>
            ],
           order: [[ 5, "asc" ]],
           "drawCallback": function ( settings ) {
