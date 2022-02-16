@@ -174,15 +174,14 @@ foreach $p (@good_entries) {
 
     # Get V magnitude or an alternate:
     if ($p->{'sy_vmag'} ne '') {
-	$V = $p->{'sy_vmag'};
+	$V = sprintf("%0.3f", $p->{'sy_vmag'});
     } elsif ($p->{'sy_gaiamag'} ne '') {
-	$V = $p->{'sy_gaiamag'};
+	$V =  sprintf("%0.3f", $p->{'sy_gaiamag'});
 	$p->{'comment'} .= " Mag is Gaia G. ";
 	print STDERR "Using Gaia mag for $p->{'pl_name'}.\n" if $DEBUG;
     } else {
 	$V = -99; 
     }
-
 
     # Some entries that have good periods are missing duration.  See
     # if we can fill that in. 
