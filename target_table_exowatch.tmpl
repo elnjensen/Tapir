@@ -1,0 +1,866 @@
+<!--  Load the Javascript libraries (JQuery and Datatables) we need --
+  --  for table interaction.  -->
+
+
+<!-- Library for better tooltips -->
+<script  type="text/javascript" src="https://unpkg.com/tippy.js@3/dist/tippy.all.min.js"></script>
+
+
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fc-3.2.5/fh-3.1.4/r-2.2.2/datatables.min.css"/>
+ 
+<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fc-3.2.5/fh-3.1.4/r-2.2.2/datatables.min.js"></script>
+
+<!--
+Extra stylesheet below modifies the default dataTables one in a few --
+  --ways; otherwise loading it would be redundant compared to above --
+  --lines. 
+--> 
+
+<link rel="stylesheet" type="text/css" href="jquery.dataTables.css">
+
+
+<!-- Initialize the table - sort by column 5 (start time),
+     floating headers, no pagination (display all entries on one
+     page). 
+ -->
+
+<!-- After each re-draw of the table renders, scroll each text box 
+     to the bottom to
+     show the end of the comment. --> 
+
+<script type="text/javascript">
+  $(document).ready( function () {
+     var table = $('#target_table').DataTable( {
+          paging: false,
+          fixedHeader: true,
+          responsive: true,
+          colReorder: true,
+	  colReorder: { realtime: false, fixedColumnsLeft: 2},
+          /* Set the DOM with DIVs to help w/ alignment. */
+          /* dom: '<"low"<"sticky"<"clear"f><"right"B>>t>ip', */
+          dom: '<"right"B><"sticky"<"clear"f><"#toolbar">>tip',
+          buttons: [
+                    {
+                     extend: 'colvis',
+		     text: 'Choose columns to show/hide',
+                    }, 
+                    {
+                      text: 'Reset column order',
+                      action: function ( e, dt, node, config ) { table.colReorder.reset(); }
+                    },
+                    {
+                     extend: 'colvisGroup',
+                     text: 'Show all columns',
+                     show: ':hidden',
+                    }, 
+                    {
+                      text: 'Disable tooltips',
+                      action: function ( ) { 
+                                  for (tip of window.tipCollection.instances) {
+                                         if (window.tipsEnabled) {
+                                             tip.disable();
+                                         } else {
+                                             tip.enable();
+                                         };
+                                  };
+                                  window.tipsEnabled = !window.tipsEnabled;
+				  scroll_comments(); /* toggles tooltips on comments */
+                                  if (window.tipsEnabled) {
+                                    this.text('Disable tooltips');
+                                  } else {
+                                    this.text('Enable tooltips');
+                                  };
+                              }
+                     },
+                   ],
+	  stateSave: true,
+          stateDuration: 0,
+          columnDefs: [
+                         { "orderSequence": [ "desc", "asc" ], 
+			   "targets": [ 6, 7, 12, 13 ] },
+			 /* These control the order in which columns get hidden */ 
+			 /* on narrower screens.  Lower priorities are hidden first. */ 
+			 /* Date, Name, V, % obs */
+     { responsivePriority: 1, targets: [0,1,2,7] },
+			 /* Start/end, Duration, BJD, Elev., Depth */
+     { responsivePriority: 2, targets: [3,4,5,6,12] },
+			 /* RA/Dec, Period */
+     { responsivePriority: 3, targets: [10,11] },
+			 /* Azimuth, HA */ 
+     { responsivePriority: 10, targets: [8, 9] },
+<TMPL_IF NAME="tess">
+			 /* Comments */ 
+     { responsivePriority: 7, targets: [15] },
+			 /* Priority, disposition */ 
+     { responsivePriority: 8, targets: [13, 14] },
+<TMPL_ELSE>
+			 /* Comments */ 
+     { responsivePriority: 7, targets: [14] },
+			 /* Rank */ 
+     { responsivePriority: 8, targets: [13] },
+</TMPL_IF>
+           ],
+          order: [[ 5, "asc" ]],
+          "drawCallback": function ( settings ) {
+              var api = this.api();
+              var rows = api.rows( {page:'current'} ).nodes();
+              var last=null;
+	      /* Get the index for *original* col 0 even if reordered: */
+	      var idx=api.colReorder.transpose( 0 );
+ 
+              api.column(idx, {page:'current'} ).data().each( function ( group, i ) {
+                  if ( last !== group ) {
+                      /* Create the label to span across columns for a given day. */
+		      var cell=api.column(idx, {page:'current'}).nodes()[i];
+		      var daylabel= cell.getAttribute('data-header-label');
+                      $(rows).eq( i ).before(
+                          '<tr class="group" style="background-color: #EEEEFF;"><td colspan="<TMPL_IF NAME="tess">16<TMPL_ELSE>15</TMPL_IF>">'+daylabel+'</td></tr>'
+                      );
+ 
+                      last = group;
+                  }
+              } );
+          }
+
+      } );
+
+
+   var scroll_comments = function() {
+     var x = document.getElementsByClassName("scroll");
+     var i;
+     for (i = 0; i < x.length; i++) {
+         var item = x[i];
+         /* Scroll to bottom of comment. */
+  	 x[i].scrollTop = x[i].scrollHeight;
+         /* Set tooltip for any cells that are scrolled. */
+         if  ((x[i].scrollHeight > x[i].clientHeight) && window.tipsEnabled) {
+	     item._tippy.enable();
+         } else {
+	     item._tippy.disable();
+	 };
+     }
+   }
+
+   var hide_on_narrow = function( elementID ) {
+       var x = document.getElementById(elementID);
+       if (x == null) {
+	   console.log("Failed to get element in hide_on_narrow:");
+	   console.log(elementID);
+	   return;
+       }
+       if ( $(window).width() < 1100 ) {
+	   $(x).hide();
+       } else {
+	   $(x).show();
+       };
+   }
+
+   /* Scroll the comment boxes on initial load. */ 
+   scroll_comments();
+
+   /* And also scroll them whenever table is redrawn. */
+   $('#target_table').on( 'draw.dt', function() {
+      scroll_comments();
+   } );
+
+   /* or the window is resized: */
+   $(window).on('resize', function () {
+        scroll_comments(); 
+	hide_on_narrow('obs-label');
+   } );
+
+   /*  Clicking in a comment cell expands or contracts it, by */
+   /*  toggling the class that sets the scroll height of the cell. */
+   $('#target_table tbody').on( 'click', 'div#comments', function () {
+        $(this).toggleClass('scroll');
+   } );
+
+   $('#non-transit_table').DataTable( {
+          "paging": false,
+          fixedHeader: true
+      } );
+
+   $('#non-transit_table').on( 'draw.dt', function() {scroll_comments();});
+
+   var reload_colvis_button = function() {
+      table.button(0).remove();
+      table.button().add(0,
+      {
+        extend: 'colvis',
+        autoClose: false,
+        fade: 0,
+	columns: ':not(.noColVis)',
+        colVis: { showAll: "Show all" }
+      });
+   }
+
+
+   table.on('column-reorder', function () {
+	   reload_colvis_button();
+       });
+   reload_colvis_button();
+   window.unobservable_showing = true;
+
+   $.fn.dataTable.ext.search.push(
+    function( settings, searchData, dataIndex ) {
+	var slider = document.getElementById("transitFracSlider");
+        var minFrac = parseInt(slider.value);
+
+	/* Get the index for *original* col even if reordered: */
+	var idx=table.colReorder.transpose( 7 );
+
+        if ( searchData[idx] >= minFrac )
+        {
+            return true;
+        } else {
+	    return false;
+	}
+    });
+
+   $.fn.dataTable.ext.search.push(
+    function( settings, searchData, dataIndex ) {
+	/* Search function for max V magnitude to show. */
+	var vmax_string = document.getElementById("vmax");
+	var vmax = parseFloat(vmax_string.value);
+
+	/* Get the index for *original* col even if reordered: */
+	var idx=table.colReorder.transpose( 2 );
+	var vobs = parseFloat(searchData[idx])
+
+	    if ( isNaN(vmax) || isNaN(vobs) || vobs <= vmax )
+        {
+            return true;
+        } else {
+	    return false;
+	}
+    });
+
+     /* Insert code in custom search toolbar */ 
+     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
+ 
+     $('#vmax').on("change keyup", function() {
+        table.draw();
+    } );
+
+
+     /* Offset floating table headers so toolbar shows: */
+   table.fixedHeader.headerOffset( $('#toolbar').outerHeight()+ 6.5 ); 
+
+   /* Hide observatory name on narrow screens: */
+   hide_on_narrow('obs-label');
+
+ } );
+
+</script>
+
+<style>
+
+  div.scroll {
+    max-height: 150px;
+    overflow-y: auto;
+  }
+
+  div.clear {
+      clear: both;
+  }
+
+  div.right {
+      float: right;
+  }
+  div.sticky {
+    position: sticky;
+    position: -webkit-sticky; /* Safari */
+    top: 0;
+    background-color: white;
+    border: 3.5px solid white;
+    width: 100%;  
+    height: 50;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .button {
+    font: bold 13px Times;
+    text-decoration: none;
+    background-color: #EEEEEE;
+    color: #333333;
+    padding: 2px 6px 0px 6px;
+    border-top: 1px solid #CCCCCC;
+    border-right: 1px solid #333333;
+    border-bottom: 1px solid #333333;
+    border-left: 1px solid #CCCCCC;
+}
+
+</style>
+
+
+  <!--  Styling to make the selected buttons for column visibility appear a different
+        color than the unselected/hidden column buttons.  -->
+
+<style>
+
+  button.dt-button:active:not(.disabled),
+  button.dt-button.active:not(.disabled),
+  div.dt-button:active:not(.disabled),
+  div.dt-button.active:not(.disabled),
+  a.dt-button:active:not(.disabled),
+  a.dt-button.active:not(.disabled){
+	color:#338833;
+  }
+
+</style>
+
+<style>
+
+  svg {
+      fill: none;
+      stroke: #000;
+      stroke-width: 1.5px;
+      vector-effect: non-scaling-stroke; 
+      display: block;
+      margin-bottom: 1px;
+  }
+
+  path {
+      vector-effect: inherit; 
+  }
+
+  .active {
+      stroke: #22E;
+      stroke-width: 3px;
+   }
+
+  .grey {
+      stroke: #555;
+      stroke-width: 2px;
+      stroke-dasharray: 4,2; 
+  }
+
+/* Manual scaling since Edge doesn't support non-scaling-stroke: */
+@supports (-ms-ime-align:auto) {
+    .active {
+      stroke-width: 33px;
+    }
+    .grey {
+      stroke-width: 22px;
+      stroke-dasharray: 44,22; 
+    }
+}
+
+</style>
+
+
+<h3>Results shown for <TMPL_VAR NAME="observatory_name">
+latitude = <TMPL_VAR NAME="observatory_latitude">, 
+longitude = <TMPL_VAR NAME="observatory_longitude">.
+</h3>
+
+<p>
+Colored text indicates <span style="color:MediumVioletRed">
+a part of the transit that is during daylight</span>, or a transit 
+<span style="color:Red">at elevation less than the user-specified limits</span>, or that
+<span style="color:#E5542C" class="with_tooltip" 
+data-tippy-content="Text is highlighted if 2000/(Moon distance) + Moon illum pct. > 100">the Moon is relatively full and close to
+  the target</span>. 
+</p>
+<p> Click on column headers to sort the table by that column.  Click
+   again to reverse the sorting order.  To sub-sort, first click one column 
+(e.g. the left-hand one to sort by night), then <em>shift-click</em>
+   another column to sort further within the first category. 
+  For example, to sort by priority within a given night (when multiple
+   nights are displayed), first click the "Local evening date" header,
+   then shift-click the "Priority" header. The highlighted column shows the current sorting.
+</p> 
+
+<p>  The buttons can be used to toggle the visibility of columns, and the
+  column order can be rearranged by clicking and dragging the column
+  header. 
+</p>
+
+
+<p>
+</p>
+
+<TMPL_IF NAME="eclipse_info">
+
+<table border="1" cellpadding="5" style="width:100%" id="target_table" class="display responsive">
+      <thead>
+	<tr>
+	  <th> Local evening date </th>
+          <th> Name </th>
+	  <th> <TMPL_IF NAME="tess">TESS mag<TMPL_ELSE>V or Kepler mag</TMPL_IF></th>
+	  <th style="white-space: nowrap"> Start&mdash;<br/>Mid<br/> &mdash;End </th>
+	  <th> Duration </th>
+	  <th> BJD<sub>TDB</sub> start-mid-end </th>
+	  <th> Elev. at start, mid, end   
+	     <TMPL_IF EXPR="baseline_hrs > 0">&plusmn;<TMPL_VAR NAME="baseline_hrs"> hrs</TMPL_IF></th>
+	  <th> % of transit (baseline) observable,<br/> Suggested
+	    obs. start, end </th>
+	  <th> Az. at start, mid, end  <TMPL_IF EXPR="baseline_hrs > 0">&plusmn;<TMPL_VAR NAME="baseline_hrs"> hrs</TMPL_IF></th>
+	  <th> HA at start, mid, end  <TMPL_IF EXPR="baseline_hrs > 0">&plusmn;<TMPL_VAR NAME="baseline_hrs"> hrs</TMPL_IF></th>
+	  <th> RA &amp; Dec (J2000) </th>
+	  <th> Period (days) </th>
+	  <th> Depth (ppt) </th>
+	  <TMPL_IF NAME="tess">
+	    <th  class="with_tooltip" data-tippy-content="<div style='text-align:left;'>
+CP = Confirmed Planet <br />
+FP = False Positive <br />
+KP = Known Planet <br />
+PC = Planet Candidate <br />
+</div>"> TFOPWG Disposition </th>
+	    <th> Master priority </th>
+	    <TMPL_ELSE>
+	      <th> Exoplanet Watch rank </th>
+	  </TMPL_IF>
+	  <th> Comments </th>
+	</tr>
+       </thead>
+<tbody>
+<TMPL_LOOP NAME="eclipse_info">
+
+<tr>
+
+<td style="text-align:center" data-sort="<TMPL_VAR NAME="sunset_jd">"
+  class="with_tooltip" data-tippy-content="Twilight UTC:  
+   <br/><TMPL_VAR NAME="sunset_UTC_datetime"><br/><TMPL_VAR NAME="sunrise_UTC_datetime">"
+						    
+  data-header-label="<TMPL_VAR NAME="sunset_local_string">: &nbsp;&nbsp;  <TMPL_VAR NAME="twilight_label">
+							   &nbsp;&nbsp; <TMPL_VAR NAME="sunset_local_datetime">
+							  &mdash;  <TMPL_VAR NAME="sunrise_local_datetime">
+							  &nbsp; local time &nbsp;&nbsp; / &nbsp;&nbsp;
+							   <TMPL_VAR NAME="sunset_UTC_datetime">
+							  &mdash;  <TMPL_VAR NAME="sunrise_UTC_datetime">
+							       &nbsp; UTC"
+> 
+    <TMPL_VAR NAME="sunset_local_string">    
+	<TMPL_IF NAME="use_utc">(local date)</TMPL_IF>
+  <p> <TMPL_VAR NAME="twilight_label"><br/> 
+
+<TMPL_IF NAME="use_utc">
+  <TMPL_VAR NAME="sunset_time_UTC"> &ndash; <TMPL_VAR NAME="sunrise_time_UTC">
+  (UTC) 
+<TMPL_ELSE>
+  <TMPL_VAR NAME="sunset_time_local"> &ndash; <TMPL_VAR NAME="sunrise_time_local">
+  (<TMPL_VAR NAME="timezone">) 
+</TMPL_IF>
+
+  </span>
+  </p>
+ </td> 
+
+   <td width="250"><span class="with_tooltip" data-tippy-content="Query the next 90 days for this target."  style="white-space: nowrap"><a
+     href="print_transits.cgi?observatory_string=<TMPL_VAR
+     NAME="observatory_string">&use_utc=<TMPL_VAR NAME="use_utc">&single_object=<TMPL_VAR 
+     NAME="single_object">&observatory_latitude=<TMPL_VAR
+     NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
+     NAME="observatory_longitude">&timezone=<TMPL_VAR
+     NAME="timezone">&days_to_print=90&days_in_past=0&target_string=<TMPL_VAR
+     NAME="name">&minimum_start_elevation=<TMPL_VAR
+     NAME="minimum_start_elevation">&and_vs_or=<TMPL_VAR 
+     NAME="and_vs_or">&minimum_end_elevation=<TMPL_VAR
+     NAME="minimum_end_elevation">&minimum_ha=<TMPL_VAR 
+     NAME="minimum_ha">&maximum_ha=<TMPL_VAR 
+     NAME="maximum_ha">&baseline_hrs=<TMPL_VAR 
+     NAME="baseline_hrs">&show_unc=<TMPL_IF
+     EXPR="time_unc > 0">1</TMPL_IF>&minimum_priority=<TMPL_VAR 
+     NAME="minimum_priority">&minimum_depth=<TMPL_VAR 
+     NAME="minimum_depth">&print_html=1&twilight=<TMPL_VAR 
+     NAME="twilight">"><TMPL_VAR NAME="name"></a></span> <TMPL_IF NAME="tess">(TOI <TMPL_VAR NAME="toi">)</TMPL_IF>
+<br/>Finding charts: 
+  <TMPL_IF EXPR="finding_chart">
+  <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
+  <a href="aladin.html?name=<TMPL_VAR NAME="name">&ra=<TMPL_VAR NAME="ra_deg">&dec=<TMPL_VAR NAME="dec_deg">&mag=<TMPL_IF EXPR="tmag"><TMPL_VAR NAME="tmag"><TMPL_ELSE><TMPL_VAR EXPR="vmag"></TMPL_IF>&depth=<TMPL_VAR NAME="depth">"
+  target="_blank"">Aladin</a>, <a href="http://sky-map.org/?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2">
+SkyMap</a>;
+<br/>
+<a
+href="plot_airmass.cgi?observatory_string=<TMPL_VAR
+NAME="observatory_string">&observatory_latitude=<TMPL_VAR
+NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
+NAME="observatory_longitude">&target=<TMPL_VAR
+NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
+NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
+NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
+NAME="jd_end">&use_utc=<TMPL_VAR 
+NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">">Airmass
+  plot</a>,
+ <a
+href="acp_plan.cgi?target=<TMPL_VAR
+NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
+NAME="dec">&jd=<TMPL_VAR
+NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
+NAME="jd_end">&jd_quit=<TMPL_VAR NAME="obs_end_jd">&V=<TMPL_VAR NAME="vmag">" target="_blank">ACP plan</a>
+
+<br/>Info: <TMPL_IF EXPR="target_page">
+<a href="<TMPL_VAR NAME="target_page">"><TMPL_VAR NAME="target_page_label"></a>,
+</TMPL_IF> 
+<a
+  href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Radius=15&Radius.unit=arcsec&Coord=<TMPL_VAR
+  NAME="coords">">Simbad</a>,
+
+<a
+href="https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html?searchQuery=%7B%22service%22%3A%22GAIADR2%22%2C%22inputText%22%3A%22<TMPL_VAR
+NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.GaiaDR2.Cone%22%2C%22title%22%3A%22Gaia%20(DR2)%3A%20<TMPL_VAR NAME="name">%20r%3D12...%22%2C%22columns%22%3A%22*%22%7D" target="_blank" class="with_tooltip" data-tippy-content="Search Gaia<br/>catalog at MAST">Gaia</a>,
+
+<a
+href="https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html?searchQuery=%7B%22service%22%3A%22TIC%22%2C%22inputText%22%3A%22<TMPL_VAR
+NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%22%2C%22title%22%3A%22TIC%3A%20<TMPL_VAR NAME="name">%20r%3D12...%22%2C%22columns%22%3A%22*%22%7D" target="_blank">TIC</a>
+</td>
+
+<td style="vertical-align:center; text-align: center;  padding:0px;" data-search="<TMPL_VAR NAME="vmag">"  data-sort="<TMPL_VAR NAME="vmag">">
+<div> <div> <TMPL_VAR NAME="vmag"><br /> &nbsp; <br /></div>
+ <div style="padding: 0px; vertical-align: bottom; border-top: 1px
+	     solid grey; text-align: center;"><br />
+<span <TMPL_IF EXPR="moon_metric > 100"> style="color:#E5542C"  
+         </TMPL_IF> >Moon <TMPL_VAR NAME="moon_illum">&#37;
+         @<TMPL_VAR NAME="moon_dist">&deg;</span> 
+</div></div>
+ </td>
+
+
+<td align="center" data-sort="<TMPL_VAR NAME="jd_start">" style="white-space: nowrap"
+  data-search="<TMPL_VAR NAME="is_observable_baseline">"
+   class="with_tooltip" data-tippy-content="Transit UTC:<br/><TMPL_IF EXPR="baseline_hrs > 0"><span style='display:block;margin-bottom:5px;'><TMPL_VAR NAME="pre_date_UTC">&nbsp;<TMPL_VAR NAME="pre_time_UTC"></span></TMPL_IF><TMPL_VAR NAME="start_date_UTC">&nbsp;<TMPL_VAR NAME="start_time_UTC"><br/><TMPL_VAR NAME="mid_date_UTC">&nbsp;<TMPL_VAR NAME="mid_time_UTC"><br/><TMPL_VAR NAME="end_date_UTC">&nbsp;<TMPL_VAR NAME="end_time_UTC"><TMPL_IF EXPR="baseline_hrs > 0"><span style='display:block;margin-top:5px;'><TMPL_VAR NAME="post_date_UTC">&nbsp;<TMPL_VAR NAME="post_time_UTC"></span></TMPL_IF>">
+
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+     <span style="opacity:0.5;display:block;margin-bottom:6px;
+       <TMPL_IF EXPR="is_daytime_pre">color:MediumVioletRed</TMPL_IF>" >
+    <TMPL_IF EXPR="use_utc">
+	 <TMPL_VAR NAME="pre_time_UTC">
+    <TMPL_ELSE>
+	 <TMPL_VAR NAME="pre_time">
+    </TMPL_IF>
+      &nbsp;&nbsp;&nbsp;&nbsp;
+</span>
+   </TMPL_IF> 
+
+    <span 
+    <TMPL_IF EXPR="starts_before_sunset"> 
+       style="color:MediumVioletRed" 
+    </TMPL_IF> 
+      >
+
+<TMPL_IF EXPR="use_utc">
+   <TMPL_VAR NAME="start_time_UTC"></span>&mdash;<br/>
+<TMPL_ELSE>
+   <TMPL_VAR NAME="start_time"></span>&mdash;<br/>
+</TMPL_IF>
+    <span 
+    <TMPL_IF EXPR="middle_in_daytime"> 
+       style="color:MediumVioletRed" 
+    </TMPL_IF> 
+    >
+
+<TMPL_IF EXPR="use_utc">
+   <TMPL_VAR NAME="mid_time_UTC">
+<TMPL_ELSE>
+   <TMPL_VAR NAME="mid_time">
+</TMPL_IF>
+
+</span><br/><span style="white-space: nowrap">
+    &mdash;<span 
+        <TMPL_IF EXPR="ends_after_sunrise"> 
+           style="color:MediumVioletRed" 
+        </TMPL_IF> 
+  ><TMPL_IF EXPR="use_utc"><TMPL_VAR NAME="end_time_UTC"><TMPL_ELSE><TMPL_VAR NAME="end_time"></TMPL_IF>
+</span></span>
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+     <span style="opacity:0.5;display:block;margin-top:6px;
+       <TMPL_IF EXPR="is_daytime_post">color:MediumVioletRed</TMPL_IF>" >
+      &nbsp;&nbsp;&nbsp;&nbsp;
+    <TMPL_IF EXPR="use_utc">
+	 <TMPL_VAR NAME="post_time_UTC">
+    <TMPL_ELSE>
+	 <TMPL_VAR NAME="post_time">
+    </TMPL_IF>
+      </span>
+   </TMPL_IF> 
+
+     <TMPL_IF EXPR="time_unc"> 
+       <span style="display:block;margin-top:4px;">&plusmn;<TMPL_VAR NAME="time_unc"></span>
+     </TMPL_IF>
+
+  </td>
+
+<td align="center" data-sort="<TMPL_VAR NAME="duration_hrs">"> <TMPL_VAR NAME="duration"> </td>
+
+<td align="center" data-sort="<TMPL_VAR NAME="bjd_mid">"> 
+    <TMPL_VAR NAME="bjd_start"><br/> <TMPL_VAR NAME="bjd_mid"><br/> 
+    <TMPL_VAR NAME="bjd_end"> </td>
+
+<td align="center"  data-sort="<TMPL_VAR NAME="start_el">">
+   
+   <TMPL_IF EXPR="baseline_hrs > 0"> <span style="opacity:0.5;display:block;margin-bottom:8px;
+       <TMPL_IF EXPR="el_pre < minimum_start_elevation">color:red  
+       </TMPL_IF>" >
+	 <TMPL_VAR NAME="el_pre">&deg;&nbsp;&nbsp;&nbsp;</span>
+   </TMPL_IF> 
+
+
+   <span <TMPL_IF EXPR="start_el < minimum_start_elevation"> style="color:red"  
+         </TMPL_IF> > 
+	 <TMPL_VAR NAME="start_el">&deg;</span>,&nbsp; <br />
+   <span <TMPL_IF EXPR="(mid_el < minimum_start_elevation) || (mid_el < minimum_end_elevation)"> style="color:red" 
+         </TMPL_IF> > 
+         <TMPL_VAR NAME="mid_el">&deg;</span>,  <br />
+   <span <TMPL_IF EXPR="end_el < minimum_end_elevation"> style="color:red"  
+         </TMPL_IF> > &nbsp;
+         <TMPL_VAR NAME="end_el">&deg;</span>
+
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> <span style="opacity:0.5;display:block;margin-top:8px;
+       <TMPL_IF EXPR="el_post < minimum_end_elevation">color:red;
+       </TMPL_IF>" >
+	   &nbsp;&nbsp;&nbsp;
+	 <TMPL_VAR NAME="el_post">&deg;</span>
+   </TMPL_IF> 
+
+</td>
+
+<td align="center"
+    data-sort="<TMPL_VAR EXPR="transit_fraction+baseline_fraction">"
+    data-search="<TMPL_VAR EXPR="transit_fraction+baseline_fraction">"
+    class="with_tooltip"
+    data-tippy-content="Obs. start/end UTC:</br><TMPL_VAR NAME="obs_start_utc"><br/><TMPL_VAR NAME="obs_end_utc">">
+<svg viewbox="0 0 1000 560" width="100%"><TMPL_VAR NAME="svg_path">
+</svg><br/>
+ <TMPL_VAR NAME="transit_fraction">% (<TMPL_VAR NAME="baseline_fraction">%) <br/>  <TMPL_VAR NAME="obs_start_time">&mdash;<TMPL_VAR NAME="obs_end_time">  </td> 
+
+<td align="center" data-sort="<TMPL_VAR NAME="start_az">">
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+     <span style="opacity:0.5;display:block;margin-bottom:8px;">
+       <TMPL_VAR NAME="az_pre">&deg;&nbsp;&nbsp;&nbsp;
+     </span>
+   </TMPL_IF> 
+
+	 <TMPL_VAR NAME="start_az">&deg;,&nbsp; <br />
+         <TMPL_VAR NAME="mid_az">&deg;, <br />
+         <TMPL_VAR NAME="end_az">&deg;
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+     <span style="opacity:0.5;display:block;margin-top:8px;">
+       &nbsp;&nbsp;
+       <TMPL_VAR NAME="az_post">&deg;
+     </span>
+   </TMPL_IF> 
+
+
+</td>
+
+<td align="center">
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+       <span style="opacity:0.5;display:block;margin-bottom:8px;
+       <TMPL_IF EXPR="(ha_pre < minimum_ha) || (ha_pre > maximum_ha)">color:red;
+       </TMPL_IF>" >
+	 <TMPL_VAR NAME="ha_pre">
+	   &nbsp;&nbsp;
+       </span>
+   </TMPL_IF> 
+
+
+   <span <TMPL_IF EXPR="(start_ha < minimum_ha) || (start_ha > maximum_ha)"> style="color:red"  
+         </TMPL_IF> > 
+	 <TMPL_VAR NAME="start_ha"></span>, &nbsp;  <br />
+   <span <TMPL_IF EXPR="(mid_ha < minimum_ha) || (mid_ha > maximum_ha)"> style="color:red"  
+         </TMPL_IF> > 
+         <TMPL_VAR NAME="mid_ha"></span>,  <br />
+   <span <TMPL_IF EXPR="(end_ha < minimum_ha) || (end_ha > maximum_ha)"> style="color:red"  
+         </TMPL_IF> > &nbsp;
+         <TMPL_VAR NAME="end_ha"></span>
+
+   <TMPL_IF EXPR="baseline_hrs > 0"> 
+       <span style="opacity:0.5;display:block;margin-top:8px;
+       <TMPL_IF EXPR="(ha_post < minimum_ha) || (ha_post > maximum_ha)">color:red;
+       </TMPL_IF>" >
+	   &nbsp;&nbsp;
+	 <TMPL_VAR NAME="ha_post">
+       </span>
+   </TMPL_IF> 
+
+
+</td>
+
+<td align="center" class="with_tooltip" data-tippy-content="RA, Dec in degrees:<br/><TMPL_VAR NAME="ra_deg"><br/><TMPL_VAR NAME="dec_deg">"><br/><TMPL_VAR NAME="ra"><br/><TMPL_VAR NAME="dec"><br/>&nbsp;</td>
+<td align="center"> <TMPL_VAR NAME="period"> </td>
+<td align="center"> <TMPL_VAR NAME="depth"> </td>
+
+<TMPL_IF NAME="tess">
+  <td align="center"> <TMPL_VAR NAME="disposition"> </td>
+  <td align="center"> <TMPL_VAR NAME="priority"> </td>
+<TMPL_ELSE>
+  <td align="center"> <TMPL_VAR NAME="priority"> </td>
+</TMPL_IF>
+
+<td align="left"> <div class="scroll" id="comments"> <TMPL_VAR NAME="comments" ESCAPE=HTML> </div> </td>
+
+</tr>
+
+</TMPL_LOOP>
+
+</tbody>
+
+</table>
+
+<TMPL_ELSE>
+<h3>  No events found that match your search criteria.</h3>
+  <TMPL_IF EXPR="no_twilight > 0">
+    <h3> In the date range searched, 
+        <span style="color:MediumVioletRed">
+	the Sun never set below your
+    specified twilight elevation
+    of <TMPL_VAR NAME="twilight">&deg;.</span></h3>
+  </TMPL_IF>
+</TMPL_IF>
+
+<TMPL_IF EXPR="non_eclipse_target_count > 0">
+<p>&nbsp;</p>
+<p />
+<hr>
+<p>&nbsp;</p>
+<p />
+<h2>Targets for out-of-transit observations</h2>
+<h3>Note: these may transit, too, so check the transit times 
+above to ensure you are observing out of transit.
+</h3>
+<p />
+<table border="1" cellpadding="5" width="99%" id="non-transit_table" class="display">
+<thead>
+	<tr>
+          <th> Name </th>
+	  <th> V mag </th>
+	  <th> Peak night-time elevation </th>
+	  <th> Time of peak elevation </th>
+	  <th> RA &amp; Dec (J2000) </th>
+	  <th> Comments </th>
+	</tr>
+</thead>
+
+<tbody>
+
+<TMPL_LOOP NAME="non_eclipse_info">
+<tr>
+   <td width="250"><TMPL_VAR NAME="name">
+
+<br/>Finding charts: 
+  <TMPL_IF EXPR="finding_chart">
+  <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
+  <a href="http://server1.sky-map.org/v2?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2">
+SkyMap</a>;
+<br/>Info: <TMPL_IF EXPR="target_page">
+<a href="<TMPL_VAR NAME="target_page">"><TMPL_VAR NAME="target_page_label"></a>,
+</TMPL_IF> 
+<a
+  href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Radius=15&Radius.unit=arcsec&Coord=<TMPL_VAR
+  NAME="coords">">Simbad</a>,
+
+<a
+href="http://vizier.cfa.harvard.edu/viz-bin/asu-acl?-source=II/246&-c=<TMPL_VAR
+NAME="coords">&-c.rm=2&-sort=_r&-out=_RA,_DE,Jmag,Hmag,Kmag,Qflg,_r">2MASS</a>;
+<br/><a
+href="plot_airmass.cgi?observatory_string=<TMPL_VAR
+NAME="observatory_string">&observatory_latitude=<TMPL_VAR
+NAME="observatory_latitude">&observatory_longitude=<TMPL_VAR
+NAME="observatory_longitude">&target=<TMPL_VAR
+NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
+NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
+NAME="sunset_jd">&use_utc=<TMPL_VAR 
+NAME="use_utc">&max_airmass=<TMPL_VAR 
+NAME="max_airmass">">Airmass plot</a>
+
+</td>
+
+<td align="center"> <TMPL_VAR NAME="vmag"> </td>
+
+<td align="center"> <TMPL_VAR NAME="max_elevation">&deg; </td>
+<td align="center"> <TMPL_VAR NAME="max_elevation_time"> </td>
+<td align="center"> <TMPL_VAR NAME="coords"> </td>
+<td align="left"> <TMPL_VAR NAME="comments"> </td>
+
+</tr>
+</TMPL_LOOP>
+</tbody>
+</table>
+
+</TMPL_IF>
+
+<TMPL_IF EXPR="show_ephemeris == 1">
+<h3>  The above transit predictions are based on the 
+      following input ephemerides: 
+</h3>
+<pre>
+   <TMPL_LOOP NAME="eclipse_input_data">
+	<TMPL_VAR NAME="line">
+   </TMPL_LOOP>
+</pre>
+</TMPL_IF>
+
+<!-- Now that all content is loaded, invoke the script to 
+     recognize and style the tooltips. -->
+
+
+<style>
+ <!-- Style for tooltips: -->
+ /* If `animateFill: true` (default) */
+ .tippy-tooltip.purple-theme .tippy-backdrop {
+   background-color: Thistle;
+   font-weight: bold;
+   color: #333;
+   font-family: "Verdana", sans-serif;
+ }
+
+ /* If `animateFill: false` */
+ .tippy-tooltip.purple-theme {
+    background: Thistle;
+    border: 2px solid Indigo;
+    color: #333;
+    font-family: "Verdana", sans-serif;
+ }
+</style>
+
+<script type='text/javascript'>
+
+
+  tippy.setDefaults(
+         {
+    	arrow: true,
+        placement: 'right',
+        size: 'large',
+        interactive: true,
+	theme: 'purple',
+  	delay: [900,400],
+  	animation: 'scale',
+	}
+	);
+
+  window.tipCollection = tippy('.with_tooltip');
+  window.tipsEnabled = true;
+  window.addEventListener('scroll', () => tippy.hideAllPoppers());
+  tippy('.scroll', {content: "Click to expand/contract",
+                    delay: [500,10],
+                   });
+
+
+  /* Run this stuff at the very end to make sure the element has been created already */ 
+
+  $(document).ready(function(){
+	//  window.onload = function(){
+
+    var slider = document.getElementById("transitFracSlider");
+    var output = document.getElementById("transitFrac");
+
+    slider.oninput = function() {
+	output.innerHTML = this.value;
+	$('#target_table').DataTable().draw();
+    }
+
+    /* Start at zero */ 
+    slider.value = 0;
+    output.innerHTML = slider.value;
+
+      });
+
+</script>
