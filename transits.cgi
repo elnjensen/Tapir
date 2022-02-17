@@ -28,6 +28,8 @@ use CGI;
 use CGI::Cookie;
 use Math::Trig;
 
+use JSON qw(decode_json); 
+
 use warnings;
 use strict;
 
@@ -39,6 +41,10 @@ use Observatories qw(%observatories_asia
 		     %observatories_south_america
 		     %observatories_eastern_us
 		     );
+
+# Get the user's approxiomate location from IP address: 
+my $info = `curl --silent https://ipinfo.io/json`; 
+my ($lat, $lon) = split(",", (decode_json $info)->{loc});
 
 #  See if they have cookies set for default values of observatory
 #  coordinates and other parameters:
@@ -87,18 +93,20 @@ if (not defined $observatory_string) {
     $observatory_string = '';
 }
 
+# If they don't have a cookie set for latitude and longitude, 
+# then default to what we get from their IP address:
 if (defined $cookies{'observatory_latitude'}) {
     $observatory_latitude = $cookies{'observatory_latitude'}->value;
 } 
 if (not defined $observatory_latitude) {
-    $observatory_latitude = '';
+    $observatory_latitude = $lat;
 }
 
 if (defined $cookies{'observatory_longitude'}) {
     $observatory_longitude = $cookies{'observatory_longitude'}->value;
 }
 if (not defined $observatory_longitude) {
-    $observatory_longitude = '';
+    $observatory_longitude = $lon;
 }
 
 if (defined $cookies{'observatory_timezone'}) {
