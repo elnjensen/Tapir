@@ -1386,9 +1386,16 @@ sub get_eclipses {
   my $max_eclipses_to_try = 2000;
 
 
+  # Whether the ingress and egress are split across different nights: 
+  my $split_transit = 0;
+
  ECLIPSE_LOOP:
   while ($eclipse_iteration < $max_eclipses_to_try) {
-    $eclipse_iteration++;
+
+    # If the split_transit flag is set, then we are doing the second
+    # pass for a transit where both ingress and egress are observable,
+    # but on different nights; don't increment the counter.
+    $eclipse_iteration++ unless $split_transit;
     # Calculate JD of next eclipse, taking into account the shift from
     # BJD at the solar system barycenter (where the ephemeris is
     # specified) to the JD_UTC observed at Earth for this particular
@@ -1434,6 +1441,12 @@ sub get_eclipses {
     # this as observable if the "observing_from_space" option is set,
     # but otherwise we will catch this below, where we require
     # observability of ingress and/or egress.
+
+    # A more complicated edge case arises if the transit duration is
+    # long and both the ingress and egress are observable at night,
+    # but on different nights.  Those are potentially two separate,
+    # observable events; they are handled with the split_transit
+    # flag below.
 
     # Convert the eclipse midpoint from JD to a DateTime object.
     # There's a slight computational cost to doing this conversion
@@ -1561,8 +1574,31 @@ sub get_eclipses {
 	     next ECLIPSE_LOOP;
 	}
 
-	# Make up a hash with all the bits of info, to return:
-	my %eclipse;
+
+	# Check for very long-duration events where both start and end
+	# could be observable, but are in different nights: 
+	my $next_sunrise = $sunrises->next($dt_start);
+	my $previous_sunset = $sunsets->previous($dt_start);
+	
+	if ($split_transit) {
+	    # This should be the second pass for a transit where both
+	    # ingress and egress are observable, but on different
+	    # nights.  We have handled ingress on the first pass, so
+	    # now handle egress (by just marking ingress as
+	    # unobservable) and reset the flag: 
+	    $start_is_observable = 0;
+	    $split_transit = 0;
+	} elsif (($start_is_observable and $end_is_observable) and 
+		 ($next_sunrise < $dt_end)) {
+	    # We have a long-duration case. We mark this as two
+	    # separate events that might both be observed. For the
+	    # first pass, we take the ingress and mark the egress as
+	    # unobservable.
+	    next ECLIPSE_LOOP if (($and_vs_or eq 'and') and 
+				  (not $observing_from_space));
+	    $end_is_observable = 0;
+	    $split_transit = 1;
+	}
 
 	# Passed other tests, now go ahead and get the mid-event
 	# elevation and daytime status: 
@@ -1579,7 +1615,9 @@ sub get_eclipses {
 				   ($el_mid_deg >= $minimum_end_elevation) and 
 				   ($el_mid_deg >= $minimum_start_elevation) and 
 				   ($ha_mid >= $minimum_ha) and 
-				   ($ha_mid <= $maximum_ha));
+				   ($ha_mid <= $maximum_ha) and 
+				 ($dt < $next_sunrise));
+
 
 
         # Determine the uncertainty on the transit time by propagating
@@ -1663,22 +1701,46 @@ sub get_eclipses {
 	    $post_time = $dt_post->hm;
 
 	    # Find observability, including baseline constraints: 
-	    $is_observable_pre = ((not $is_daytime_pre) and 
+	    $is_observable_pre = ($start_is_observable and 
+				  (not $is_daytime_pre) and 
 				  ($el_pre >= $minimum_start_elevation) and 
 				  ($ha_pre >= $minimum_ha) and 
-				  ($ha_pre <= $maximum_ha));
+				  ($ha_pre <= $maximum_ha) and 
+				  ($dt_pre > $previous_sunset));
 
-	    $is_observable_post = ((not $is_daytime_post) and 
+	    $is_observable_post = ($end_is_observable and 
+				   (not $is_daytime_post) and 
 				   ($el_post >= $minimum_end_elevation) and 
 				   ($ha_post >= $minimum_ha) and 
-				   ($ha_post <= $maximum_ha));
+				   ($ha_post <= $maximum_ha) and 
+				   ($dt_post < $next_sunrise));
 
 	    $is_observable_baseline = eval("\$is_observable_pre $and_vs_or \$is_observable_post");
 	}
 
-
         # Find the times when we can actually start or end observing, 
         # given the constraints.
+
+
+	# Get the correct local sunset date for the eclipse.  We know
+	# at this point that part of the eclipse is observable, so 
+	# if it's the ingress, we use the sunset before that.  If
+	# that's not observable, then the egress must be, so we use 
+	# the sunset before *that* instead. 
+
+	my ($sunrise_object, $sunset_object);
+	if ($start_is_observable) {
+	  # Find previous sunset for ingress:
+	  $sunset_object = $sunsets->previous($dt_start)->clone;
+	} else {
+	  # Find previous sunset for egress:
+	  $sunset_object = $sunsets->previous($dt_end)->clone;
+	}
+
+        # Once we have the desired sunset, then we always
+        # want the sunrise that follows: 
+        $sunrise_object = $sunrises->next($sunset_object)->clone;
+
 
 	# If ingress is observable, we'll tack on some previous
         # baseline to see how much more we can observe.  If not, we
@@ -1694,11 +1756,19 @@ sub get_eclipses {
 	    $obs_start_time = $dt_start -
 		hours_to_duration($desired_baseline);
 	} else {
+	    # If the nominal start time (ingress) for our search is 
+	    # before the night starts, then start search from sunset
+	    # of the relevant night instead.  This can save time
+	    # in typical cases, but is also essential for correctly
+	    # handling very-long-transit cases to make sure we 
+	    # aren't inadvertently searching in the wrong night. 
+	    my $search_start = ($dt_start > $sunset_object) ? $dt_start : $sunset_object;
+	    
 	    $obs_start_time = 
 		observable_time({
 		    target => $target, 
 		    name => $name,
-		    start_time => $dt_start, 
+		    start_time => $search_start, 
 		    max_time => $dt_end,
 		    max_baseline => $max_baseline,
 		    minimum_elevation =>  $minimum_start_elevation,
@@ -1706,6 +1776,8 @@ sub get_eclipses {
 		    minimum_ha => $minimum_ha,
 		    maximum_ha => $maximum_ha,
 		    sun => $sun,
+		    is_daytime_start => $is_daytime_start,
+		    is_daytime_end => $is_daytime_end,
 		    twilight_rad => $twilight_rad,
 		    backward => 0,
 		    time_step_minutes => 1,
@@ -1713,7 +1785,28 @@ sub get_eclipses {
 		);
 	}
 
-	# Same logic for egress: 
+	# Same logic for egress.  Here we also want to be careful of
+	# the very-long-transit cases, so we check to make sure that
+	# we are staying within the same night, and not inadverently
+	# getting an end time that is in the *following* night. 
+
+	my $search_end_time = $dt_end;
+	my $daytime_end_flag = $is_daytime_end;
+	# But if the end happens to be after the sun rises, start the
+	# search earlier: 
+	if ($dt_end > $sunrise_object) {
+	    $search_end_time = $sunrise_object;
+	    # We also tweak this flag for whether it is daytime at the
+	    # end; nominally this applies to the egress time, but here
+	    # we want to signal that no matter where the egress is
+	    # (e.g. in the next night) that we won't be able to
+	    # observe it.  Setting this daytime end flag will force
+	    # it to search only within the current night, without
+	    # influencing the color-coding of the actual end time: 
+	    $daytime_end_flag = 1;
+	    $end_is_observable = 0;
+	}
+
 	$max_baseline = $end_is_observable ? $desired_baseline : 0;
 
 	my $obs_end_time;
@@ -1731,7 +1824,7 @@ sub get_eclipses {
 		observable_time({
 		    target => $target, 
 		    name => $name,
-		    start_time => $dt_end, 
+		    start_time => $search_end_time, 
 		    max_time => $dt_start,
 		    max_baseline => $max_baseline,
 		    minimum_elevation =>  $minimum_end_elevation,
@@ -1739,6 +1832,8 @@ sub get_eclipses {
 		    minimum_ha => $minimum_ha,
 		    maximum_ha => $maximum_ha,
 		    sun => $sun,
+		    is_daytime_start => $is_daytime_start,
+		    is_daytime_end => $daytime_end_flag,
 		    twilight_rad => $twilight_rad,
 		    backward => 1,
 				}
@@ -1840,6 +1935,8 @@ sub get_eclipses {
 	    $baseline_fraction += 50*$baseline_post_hrs/$desired_baseline;
 	}	    
 
+	# Make up a hash with all the bits of info, to return:
+	my %eclipse;
 
 	# SVG tags for displaying the transit.  We want everything in
 	# decimal hours, passed in relative to ingress: 
@@ -1909,29 +2006,6 @@ sub get_eclipses {
 	# evening date.  Note that this approximate timezone was
 	# already calculated above to specify the correct local start
 	# date. 
-
-	# First, get the correct local sunset date for the
-	# eclipse. We set the time to the mid-point of the
-	# eclipse, and then check conditions to see if the
-	# evening sunset associated with this date comes
-	# before or after that.
-
-	my ($sunrise_object, $sunset_object);
-	if (($is_daytime_start) and ($is_daytime_mid)) {
-	  # Find next sunset:
-	  $sunset_object = $sunsets->next($dt)->clone;
-	} else {
-	  # Find previous sunset
-	  $sunset_object = $sunsets->previous($dt)->clone;
-	}
-
-	if (($is_daytime_mid) and ($is_daytime_end)) {
-	  # Find previous sunrise
-	  $sunrise_object = $sunrises->previous($dt)->clone;
-	} else {
-	  # Find next sunrise
-	  $sunrise_object = $sunrises->next($dt)->clone;
-	}
 
 
 	# Before shifting timezones, grab the UT dates of 
