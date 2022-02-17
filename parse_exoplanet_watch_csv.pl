@@ -96,7 +96,11 @@ my ($p, $V, $comment, $name, $duration,
 # Slurp all the lines from the file so we can loop over them and group
 # together entries for the same planet. 
 
-my $datafile = $ARGV[0];
+# Read from STDIN unless a filename is passed on the command line: 
+my $datafile = *STDIN;
+if (defined $ARGV[0]) {
+    $datafile = $ARGV[0];
+}
 
 # Read the CSV file; return value is a reference to an array of
 # hashes, so immediately dereference to get the array: 
