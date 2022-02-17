@@ -300,6 +300,8 @@ my $target_string = encode_entities($q->param("target_string"));
 if (not defined $target_string) {
     $target_string = '';
 } else {
+    # Eliminate the most obvious vulnerability here:
+    $target_string =~ s/script//ig;
     # Strip leading and trailing whitespace on this string:
     $target_string =~ s/^\s*(\S+)\s*$/$1/;
 }
@@ -981,7 +983,8 @@ foreach my $target_ref (@lines) {
   }
 
   # See if the target is too faint:
-  if ((defined $target_info{vmag}) and 
+  if ((defined $target_info{vmag}) and
+      ($target_info{vmag} !~ /^\s*$/) and
       ($target_info{vmag} > $maximum_V_mag)) {
       next TARGET_LOOP;
   }
@@ -2497,11 +2500,25 @@ sub hours_to_duration {
 sub hours_to_hm {
 
 # Takes a decimal number of hours and returns a string of the form
-# h:mm or hh:mm. Using a floating point format for minutes means
-# that minutes are rounded rather than truncated.
+# h:mm or hh:mm, properly rounded to the nearest minute. 
 
     my $hrs = shift;
-    return sprintf("%d:%02.0f", int($hrs), 60*($hrs - int($hrs)));
+    my $h_int = int($hrs);
+
+    my $min = 60*($hrs - $h_int);
+    my $m_int = int($min);
+
+    my $sec = 60*($min - $m_int);
+
+    $m_int++ if ($sec >= 30); 
+
+    # If rounding up crosses an hour boundary, handle that.
+    if ($m_int == 60) {
+	$m_int = 0;
+	$h_int++;
+    }
+    return sprintf("%d:%02d", $h_int, $m_int);
+
 }
 
 sub observable_time {
@@ -2589,7 +2606,8 @@ sub observable_time {
     # requested baseline time.  If the search direction is backward,
     # then $baseline will be a negative duration, meaning this logic
     # will extend the initial time (from which we'll search back).
-
+    # Note that this start time for the search window may be modified
+    # below, e.g. if it's not at night. 
     my $time = $args->{'start_time'} - $baseline;
     my $target = $args->{'target'};
 
@@ -2597,29 +2615,56 @@ sub observable_time {
     my $search_start = $time;
 
 
-    # Start with the daytime constraint. 
+    # Start with the constraint that our search window needs to be at
+    # night, and to stay during the same night as the event of interest: 
 
     my $sun = $args->{'sun'};
-    $sun->datetime($time);
+    # Set sun to time of event, so we can check relevant
+    # sunrise/sunset times, to keep search window in darkness: 
+    $sun->datetime($args->{'start_time'});
 
-    # If the sun is still up at the start of the search window,
-    # adjust our time accordingly.
-    if ( $sun->el(format=>'rad') > $args->{'twilight_rad'} ) {
-	# Note: these could fail if the search location is at polar
-	# latitudes and always-daylight times haven't been filtered
-	# out above, but they should have been handled already.  For
-	# always-night times of year, we never get into this block.
-	if ($sign == 1){
-	    # Next sunset:
-	    $time = $sun->set_time( horizon => $args->{'twilight_rad'});
+    # In the block below, the sunrise or sunset times could be
+    # undefined for sites near the poles.
+    if ($sign == 1){
+	if ($args->{'is_daytime_start'}) {
+	    # Start searching as soon as it gets dark, i.e. at the 
+	    # next sunset: 
+	    my $next_sunset = $sun->set_time( horizon => 
+					      $args->{'twilight_rad'});
+	    $time = $next_sunset if (defined $next_sunset);
 	} else {
-	    # Previous sunrise:
-	    $time = $sun->rise_time( horizon =>
-				     $args->{'twilight_rad'}, 
-		                     event => -1);
+	    # Start is in darkness, so find the previous sunset that starts the night:
+	    my $start_of_night = $sun->set_time( horizon => 
+						 $args->{'twilight_rad'}, 
+						 event => -1);
+	    # Start at the later of the start of night and the suggested 
+	    # start window;
+	    if ((defined $start_of_night) and 
+		(DateTime->compare( $start_of_night, $time ) == 1)) {
+		$time = $start_of_night;
+	    }
+	}
+    } else {
+	# Backward searching to set end time. 
+	if ($args->{'is_daytime_end'}) {
+	    # Start searching as soon as it gets dark (looking back),
+	    # i.e. at the previous sunrise: 
+	    my $previous_sunrise = $sun->rise_time( horizon => 
+						    $args->{'twilight_rad'},
+						    event => -1);
+	    $time = $previous_sunrise if (defined $previous_sunrise);
+	} else {
+	    # Find the next sunrise that ends the night:
+	    my $end_of_night = $sun->rise_time( horizon => 
+						$args->{'twilight_rad'});
+	    # Start at the earlier of the end of night and the suggested 
+	    # start window:
+	    if ((defined $end_of_night) and 
+		(DateTime->compare( $time, $end_of_night ) == 1)) {
+		$time = $end_of_night;
+	    }
 	}
     }
-
 
     if ($DEBUG) {
 	$sun->datetime($time);
@@ -2989,6 +3034,75 @@ sub bjd2utcjd {
     return $bjd - $delta_t/86400;
 }
 
+sub refine_ha_limits {
+
+# Given input minimum and maximum hour angle limits, and a start and
+# end time, find the sub-intervals where the limits are met. The
+# assumption is that this is for an under-the-pole case, so that the
+# starting and ending HA are OK, but somewhere in the middle the
+# target crosses from +12 to -12.  Return start1, end1, start2, end2 -
+# all DateTimes that define the start and end of the two valid
+# intervals.  Thus, the time from end1 to start2 is when the hour
+# angle limits are violated.
+#
+# Input: hash reference with minimum_ha, maximum_ha, start, end,
+# target.  start and end are DateTime objects, target is an
+# Astro::Coords object.
+#
+# Return: start1, end1, start2, end2; all DateTimes.
+
+    my ($args) = @_;
+
+    my $target = $args->{'target'};
+    my $time = $args->{'start'}->clone();
+    $target->datetime($time);
+    my $ha_start = $target->ha(format=>'hour');
+    my $inc = DateTime::Duration->new( minutes => 1);
+    $target->datetime($args->{'end'});
+    my $ha_end = $target->ha(format=>'hour');
+
+    # First, check the input assumptions:
+    if (($ha_start < $args->{'minimum_ha'}) or
+	($ha_start > $args->{'maximum_ha'}) or
+	($ha_end   < $args->{'minimum_ha'}) or
+	($ha_end   > $args->{'maximum_ha'}))
+    {
+	fatal_error("Not starting at a valid hour angle in" .
+		    " refine_ha_limits. ha_start: $ha_start ha_end: $ha_end");
+    } elsif (($ha_end > 0) or ($ha_start < 0)) {
+	fatal_error("Target does not pass under pole in" .
+		    " refine_ha_limits: ha_start: $ha_start ha_end: $ha_end");
+    }
+
+    # Those checks should verify that we are starting at a valid
+    # HA. Save the start time:
+    my $start1 = $time->clone();
+
+    my $ha = $ha_start;
+    while (($ha >= $args->{'minimum_ha'}) and ($ha <= $args->{'maximum_ha'})) {
+	$time = $time + $inc;
+	$target->datetime($time);
+	$ha = $target->ha(format=>'hour');
+    }
+
+    # Now we should have the end of the first observable window:
+    my $end1 = $time->clone();
+
+    # Now skip over the unobservable part:
+
+    while (($ha < $args->{'minimum_ha'}) or ($ha < $args->{'maximum_ha'})) {
+	$time = $time + $inc;
+	$target->datetime($time);
+	$ha =  $target->ha(format=>'hour');
+    }
+
+    # This should be the start of the second observable window:
+    my $start2 = $time->clone();
+    my $end2 = $args->{'end'}->clone();
+
+    return ($start1, $end1, $start2, $end2);
+
+}
 
 sub num_only {
     # Take input and return a string that includes only
