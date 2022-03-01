@@ -590,7 +590,9 @@ Checked
 </div>
 <br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="3" onclick="show_hide(this.value,'1','ephem_block')"
-/> Exoplanet Watch targets ($n_planets_exowatch planets; <a
+/> <a
+href="https://exoplanets.nasa.gov/exoplanet-watch/about-exoplanet-watch/overview/"
+target='_blank'>Exoplanet Watch</a> targets ($n_planets_exowatch planets; <a
 				    href="exoplanet_watch_targets.csv">CSV
 			     file</a>)
 <br/>
