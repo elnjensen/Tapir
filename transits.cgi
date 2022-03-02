@@ -538,11 +538,10 @@ input[type=submit] {
 
 <p style="color:purple"> 
 <em> 
-Latest update (Sep. 2021): The database of transiting planets used below is
-    currently slightly behind the NASA list and does not include transiting
-    planets added to the NASA Exoplanet Archive since April 2021.  I
-    need to find time to update the code to deal with their new table
-    format. I hope to do that soon. (The TOI list is up-to-date.) 
+Latest update (March 2022): Targets for <a
+href="https://exoplanets.nasa.gov/exoplanet-watch/about-exoplanet-watch/overview/"
+target='_blank'>Exoplanet Watch</a> are now
+    included.  
 </em>
 </p>
 
