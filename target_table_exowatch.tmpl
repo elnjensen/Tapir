@@ -72,6 +72,34 @@ Extra stylesheet below modifies the default dataTables one in a few --
                                   };
                               }
                      },
+                    {
+                      text: 'Clear filters',
+                      action: function ( ) { 
+			    /* Button to toggle state of filtering of
+			       targets shown.
+			    */
+
+			    /* If default filtering is *on* (true), that
+			       means that our action is to _clear_ in order
+			       to change that, so clear_vals is also true: 
+			    */
+			    set_default_filters(clear_vals=window.filteringOn);
+
+			    /* Toggle the variable, and set button text: */
+			    window.filteringOn = !window.filteringOn;
+
+			    if (window.filteringOn) {
+				this.text('Clear filters');
+			    } else {
+				this.text('Use default filters');
+			    }
+
+			    /* Make sure new search values take effect, 
+			       also chaining 'search' with an empty argument to 
+			       clear the text input search box: */
+			    $('#target_table').DataTable().search('').draw();
+			}
+                     },
                    ],
 	  stateSave: true,
           stateDuration: 0,
@@ -139,11 +167,41 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	   console.log(elementID);
 	   return;
        }
-       if ( $(window).width() < 1100 ) {
+       if ( $(window).width() < 1300 ) {
 	   $(x).hide();
        } else {
 	   $(x).show();
        };
+   };
+
+   set_default_filters = function( clear_vals=false ) {
+       /* Function to set search filters to their default values;
+	  called at start, but also can be invoked via a button.  If
+	  'clear' is set to true, existing filters are cleared
+	  instead.
+       */
+
+       /* First value in each set is default, second is value if 
+	  cleared. */
+       let vmax = ['', ''];
+       let depth = [2.5, 0];
+       let transit_frac = [100, 0];
+
+       let i = 0;
+       if (clear_vals) {
+	   i = 1;
+       }
+
+       var slider = document.getElementById("transitFracSlider");
+       var output = document.getElementById("transitFrac");
+
+       /* Start transit+OOT_fraction at 100 (max is 200) */ 
+       slider.value = transit_frac[i];
+       output.innerHTML = slider.value;
+
+       document.getElementById("vmax").value= vmax[i];
+       document.getElementById("depth_min").value = depth[i];
+
    }
 
    /* Scroll the comment boxes on initial load. */ 
@@ -226,10 +284,32 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	}
     });
 
+   $.fn.dataTable.ext.search.push(
+    function( settings, searchData, dataIndex ) {
+	/* Search function for minimum transit depth to show. */
+	var depth_min_string = document.getElementById("depth_min");
+	var depth_min = parseFloat(depth_min_string.value);
+
+	/* Get the index for *original* col even if reordered: */
+	var idx=table.colReorder.transpose( 12 );
+	var depth_obs = parseFloat(searchData[idx])
+
+	    if ( isNaN(depth_min) || isNaN(depth_obs) || depth_obs >= depth_min )
+        {
+            return true;
+        } else {
+	    return false;
+	}
+    });
+
      /* Insert code in custom search toolbar */ 
-     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
+     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="2.5" style="width: 3.5em" id="depth_min"><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
  
      $('#vmax').on("change keyup", function() {
+        table.draw();
+    } );
+
+     $('#depth_min').on("change keyup", function() {
         table.draw();
     } );
 
@@ -842,7 +922,6 @@ NAME="max_airmass">">Airmass plot</a>
   /* Run this stuff at the very end to make sure the element has been created already */ 
 
   $(document).ready(function(){
-	//  window.onload = function(){
 
     var slider = document.getElementById("transitFracSlider");
     var output = document.getElementById("transitFrac");
@@ -852,9 +931,13 @@ NAME="max_airmass">">Airmass plot</a>
 	$('#target_table').DataTable().draw();
     }
 
-    /* Start at zero */ 
-    slider.value = 0;
-    output.innerHTML = slider.value;
+    set_default_filters();
+
+    /* Define a global var for state of filtering: */
+    window.filteringOn = true;
+
+    /* Make sure initial search values take effect: */
+    $('#target_table').DataTable().draw();
 
       });
 
