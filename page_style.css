@@ -3,7 +3,7 @@ forms, like airmass.cgi, finding_charts.cgi, and transits.cgi.
 */
 
 body {
-	width: 700px;
+	max-width: 700px;
 	margin:10px 50px 50px 20px;
 	padding:10px;
 	background-color:white;
