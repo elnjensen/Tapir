@@ -414,9 +414,10 @@ observability of the known transiting exoplanets or TESS Objects of Interest
 }
 
 label {
-    width: 45px;
+    width: 200px;
     display: block;
     vertical-align: middle;
+    text-align: right;
     float:left;
 }
 
@@ -431,7 +432,6 @@ input[type=submit] {
   border-radius: 6px; 
   text-align: center;
 }
-
 
 /* The Modal (background) */
 .modal {
@@ -608,51 +608,45 @@ this only if you want to manually enter the ephemeris for some
 other target (or try an alternate ephemeris for a known target). </i>
 </p>
 
-<div id="ephemeris" style="margin-left:2cm;">
+<div id="ephemeris" style="margin-left:2mm;">
+
 <p>
-<table style="border-spacing:0; padding-left:10px" >
-
-<tr>
-<td> RA (J2000): &nbsp; </td> <td> <INPUT TYPE="text" size="15" name="ra"></td>
-</tr>
-<tr>
-<td>Dec (J2000): &nbsp;</td> <td> <INPUT TYPE="text" size="15" name="dec"></td>
-</tr>
-
-<tr>
-<td> BJD of mid-transit: &nbsp; </td>
-<td><input type="text" size="15"
-    name="epoch"  style="text-align:center" /></td>
-</tr>
-<tr>
-<td>Period (days): &nbsp;</td>
-<td><input type="text" size="15"
-    name="period"  style="text-align:center" /></td>
-</tr>
-<tr>
-<td>Transit duration (hours): &nbsp;</td>
-<td><input type="text" size="15"
-    name="duration"  style="text-align:center" /></td>
-</tr>
-
-<tr>
-<td>Transit depth (ppt): &nbsp;</td>
-<td><input type="text" size="15"
-    name="depth"  style="text-align:center" /></td>
-</tr>
-
-<tr>
-<td>Target name (<i>optional, for labeling only</i>): &nbsp;</td>
-<td>
-<input type="text" size="15"
-    name="target"  style="text-align:center" />
-</td>
-</tr>
-
-</table>
+<label class="ephem"> RA (J2000): &nbsp; </label> 
+<input type="text" size="15" class="ephem" name="ra"> (hh:mm:ss or decimal <em>hours</em>)
+</p>
+<p>
+<label class="ephem"> Dec (J2000): &nbsp;</label> 
+<input type="text" size="15" class="ephem"  name="dec"> (dd:mm:ss or decimal degrees)
+</p>
+<p>
+<label class="ephem"> BJD of mid-transit: &nbsp; </label>
+<input type="text" size="15" class="ephem"
+    name="epoch"  style="text-align:center" />
+</p>
+<p>
+<label class="ephem">Period (days): &nbsp; </label>
+ <input type="text" size="15" class="ephem"
+    name="period"  style="text-align:center" />
+</p>
+<p>
+<label class="ephem">Transit duration (hours): &nbsp;</label>
+<input type="text" size="15" class="ephem"
+    name="duration"  style="text-align:center" />
+</p>
+<p>
+<label class="ephem">Transit depth (ppt): &nbsp;</label>
+<input type="text" size="15" class="ephem"
+    name="depth"  style="text-align:center" />
+</p>
+<p>
+<label class="ephem">Target name: &nbsp;</label>
+<input type="text" size="15" class="ephem"
+    name="target"  style="text-align:center" /> (<em>optional, for labeling only</em>)
+</p>
 </div>
 </div>
 </div>
+
 
 END_1
 
@@ -1086,6 +1080,15 @@ href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
 	    modal.style.display = "none";
 	}
     } 
+
+// Make sure the ephemeris block is showing only if selected:
+    target_list = document.querySelector('input[name="single_object"]:checked').value;
+    show_hide(target_list, 1, 'ephem_block');
+
+// Likewise for the observatory coordinate manual entry: 
+    obs_selected = document.getElementById('obs').value;
+    show_hide(obs_selected,'Specified_Lat_Long','lat_long');
+
 
 </script>
 
