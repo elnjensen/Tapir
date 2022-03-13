@@ -950,9 +950,19 @@ foreach my $target_ref (@lines) {
   # targets, and if so, see if this one matches.  If it doesn't, we
   # can just go on to the next target:
   if ($target_string ne "") {
-    if ($target_info{name} !~ /$target_string/i) {
-      next TARGET_LOOP;
-    }
+      if ($tess) {
+	  # Users might add "TOI" to search since it's in the output: 
+	  my $toi_string = "TOI " .  $target_info{TOI};
+	  unless (($target_info{name} =~ /$target_string/i) or 
+		  ($toi_string =~ /$target_string/i))
+	  {
+	      next TARGET_LOOP;
+	  }
+      } else {
+	  if ($target_info{name} !~ /$target_string/i) {
+	      next TARGET_LOOP;
+	  }
+      }
   }
 
 
