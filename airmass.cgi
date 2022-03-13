@@ -393,10 +393,12 @@ if ($use_utc) {
 
 print << "END_2";
 
-&nbsp; <INPUT TYPE="radio" NAME="use_utc" VALUE="1" $utc_on_string/> 
+<p/>
+<p> <INPUT TYPE="radio" NAME="use_utc" VALUE="1" $utc_on_string/> 
 Use UTC &nbsp;/&nbsp;
 <INPUT TYPE="radio" NAME="use_utc" VALUE="0" $utc_off_string/> 
 Use observatory\'s local time.
+</p>
 </div>
 
 <DIV id="lat_long" class="$lat_long_class">
@@ -517,14 +519,15 @@ Date for airmass plot (mm-dd-yyyy or <i>'today'</i>):
 Target name:
 <input type="text" size="15"
     name="target"  style="text-align:center" />
-<i>&nbsp;(Will be resolved by Simbad/NED if no coordinates given below.)</i>
+<i>&nbsp;(Will be resolved by Simbad/NED if no coordinates given.)</i>
 </p>
 
 <p>
-RA (J2000): <INPUT TYPE="text" name="ra"> (decimal or sexigesimal, but
-					   must be in <em>hours</em>,
-					   not degrees)<br />
-Dec (J2000): <INPUT TYPE="text" name="dec"> (decimal or sexigesimal degrees)
+RA (J2000): <INPUT TYPE="text" name="ra"> (hh:mm:ss or decimal
+					  <em>hours</em>)
+</p>
+<p>
+Dec (J2000): <INPUT TYPE="text" name="dec"> (dd:mm:ss or decimal degrees)
 </p>
 
 <p>
@@ -561,6 +564,13 @@ href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on airmass form"
 >here</a>.
 </p>
 </body>
+
+<script type="text/javascript">
+// Make sure visibility is correct on load for the observatory coordinate manual entry: 
+    obs_selected = document.getElementById('obs').value;
+    show_lat_long(obs_selected);
+</script>
+
 
 </html>
 
