@@ -1221,8 +1221,10 @@ if ($print_html) {   # True for either 1 or 2
   print $template->output();
 
   if ($print_html == 1) {
-      my $execution_time = sprintf("Script took %d seconds for %d events.", 
-				   time - $script_start_time, $n_eclipses);
+      my $time_seconds =  sprintf("%d", time - $script_start_time);
+      my $seconds_word = ($time_seconds eq "1") ? "second" : "seconds";
+      my $execution_time = sprintf("Script took %s %s for %d events.", 
+				   $time_seconds, $seconds_word, $n_eclipses);
       print $q->p($execution_time);
       print $q->end_html;
   }
