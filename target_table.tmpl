@@ -146,7 +146,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	   console.log(elementID);
 	   return;
        }
-       if ( $(window).width() < 1100 ) {
+       if ( $(window).width() < 1410 ) {
 	   $(x).hide();
        } else {
 	   $(x).show();
@@ -461,12 +461,12 @@ PC = Planet Candidate <br />
      EXPR="time_unc > 0">1</TMPL_IF>&minimum_priority=<TMPL_VAR 
      NAME="minimum_priority">&minimum_depth=<TMPL_VAR 
      NAME="minimum_depth">&print_html=1&twilight=<TMPL_VAR 
-     NAME="twilight">"><TMPL_VAR NAME="name"></a></span> <TMPL_IF NAME="tess">(TOI <TMPL_VAR NAME="toi">)</TMPL_IF>
+     NAME="twilight">" target='_blank'><TMPL_VAR NAME="name"></a></span> <TMPL_IF NAME="tess">(TOI <TMPL_VAR NAME="toi">)</TMPL_IF>
 <br/>Finding charts: 
   <TMPL_IF EXPR="finding_chart">
-  <a href="<TMPL_VAR NAME="finding_chart">">Annotated</a>,</TMPL_IF> 
+  <a href="<TMPL_VAR NAME="finding_chart">" target='_blank'>Annotated</a>,</TMPL_IF> 
   <a href="aladin.html?name=<TMPL_VAR NAME="name">&ra=<TMPL_VAR NAME="ra_deg">&dec=<TMPL_VAR NAME="dec_deg">&mag=<TMPL_IF EXPR="tmag"><TMPL_VAR NAME="tmag"><TMPL_ELSE><TMPL_VAR EXPR="vmag"></TMPL_IF>&depth=<TMPL_VAR NAME="depth">"
-  target="_blank"">Aladin</a>, <a href="http://sky-map.org/?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2">
+  target="_blank">Aladin</a>, <a href="http://sky-map.org/?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2" target='_blank'>
 SkyMap</a>;
 <br/>
 <a
@@ -478,7 +478,7 @@ NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
 NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
 NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
 NAME="jd_end">&use_utc=<TMPL_VAR 
-NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">">Airmass
+NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">" target='_blank'>Airmass
   plot</a>,
  <a
 href="acp_plan.cgi?target=<TMPL_VAR
@@ -488,11 +488,11 @@ NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
 NAME="jd_end">&jd_quit=<TMPL_VAR NAME="obs_end_jd">&V=<TMPL_VAR NAME="vmag">" target="_blank">ACP plan</a>
 
 <br/>Info: <TMPL_IF EXPR="target_page">
-<a href="<TMPL_VAR NAME="target_page">"><TMPL_VAR NAME="target_page_label"></a>,
+<a href="<TMPL_VAR NAME="target_page">" target='_blank'><TMPL_VAR NAME="target_page_label"></a>,
 </TMPL_IF> 
 <a
   href="http://simbad.u-strasbg.fr/simbad/sim-coo?output.format=HTML&Radius=15&Radius.unit=arcsec&Coord=<TMPL_VAR
-  NAME="coords">">Simbad</a>,
+  NAME="coords">" target='_blank'>Simbad</a>,
 
 <a
 href="https://mast.stsci.edu/portal/Mashup/Clients/Mast/Portal.html?searchQuery=%7B%22service%22%3A%22GAIADR2%22%2C%22inputText%22%3A%22<TMPL_VAR
