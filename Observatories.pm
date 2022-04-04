@@ -277,6 +277,13 @@ our %observatories_europe = (
 	       timezone => "Atlantic/Canary",
 	   },
 
+	   "Observatorio Terrassa, Spain" => {
+	       latitude => 41.571578,
+	       longitude => 2.0349,
+	       timezone_integer => -1,
+	       timezone => 'Europe/Madrid',
+	   },
+
 	   "Observatorio de Sierra Nevada, Spain" => {
 	       latitude => 37.064167,
 	       longitude => -3.384722,
