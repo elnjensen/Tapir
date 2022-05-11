@@ -254,9 +254,9 @@ while ($i < $n_good) {
 
     # Get magnitude from default params: 
     if ($p_best->{'sy_vmag'} ne '') {
-	$V = $p_best->{'sy_vmag'};
+	$V = sprintf("%0.1f", $p_best->{'sy_vmag'});
     } elsif ($p_best->{'sy_gaiamag'} ne '') {
-	$V = $p_best->{'sy_gaiamag'};
+	$V = sprintf("%0.1f", $p_best->{'sy_gaiamag'});
 	$p_best->{'comment'} .= " Mag is Gaia G. ";
     } else {
 	$V = -99; 
