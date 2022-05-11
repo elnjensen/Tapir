@@ -538,7 +538,10 @@ sub estimate_duration {
 	undef $duration; 
 	return ($duration, $status, $comment); 
     }
-    $duration = ($p->{'pl_orbper'} / ($a_over_r * pi))
+    # Calculate duration, converting from days (from orbital
+    # period) to hours to match how duration is given
+    # in input data: 
+    $duration = 24. * ($p->{'pl_orbper'} / ($a_over_r * pi))
 	* sqrt($sqrt_term); 
     $comment = "Duration estimated. "; 
     $status = 1; 
