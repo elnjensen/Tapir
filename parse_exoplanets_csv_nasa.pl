@@ -71,6 +71,10 @@ binmode(STDOUT, ":utf8");
 # Unbuffered output, helps with tracking error messages: 
 $| = 1;
 
+# An alternate target file to pull data from in the event 
+# that data here are incomplete: 
+my $composite_params_file = 'exoplanet_archive_transits_full_composite.txt';
+
 # Set the -d flag ("debug") for verbose output of (some) problems.
 
 our ($opt_d, $DEBUG);
@@ -111,6 +115,23 @@ my @csv_lines = @{ Text::CSV::csv(allow_whitespace => '1',
 				  encoding => "UTF8",
 				  headers => "auto",
 		                  )};
+
+# In addition, read in the file with the magnitudes and some other
+# params: 
+
+my @composite_lines = @{ Text::CSV::csv(in => $composite_params_file, 
+				   encoding => "UTF8",
+				   headers => "auto",
+		                 )}; 
+
+
+# Now @mag_lines is a list of hash references. Use it to create a lookup hash,
+# keyed by the name of the planet.  In this map function, we iterate
+# over the list, and iteratively use the name entry to create a key to
+# a hash, with the value containing the relevant line: 
+my %default_pars = map { $_->{"pl_name"} => $_ } @composite_lines; 
+
+
 
 # Make a first pass through the targets to save only those entries
 # that have sufficient information for us to calculate an ephemeris;
@@ -252,11 +273,15 @@ while ($i < $n_good) {
     # Some entries that have good periods are missing duration.  See
     # if we can fill that in. 
 
+
+    # Get the "default parameters" entry for this system: 
+    my $pars = $default_pars{$p_best->{'pl_name'}};
+
     # Get magnitude from default params: 
-    if ($p_best->{'sy_vmag'} ne '') {
-	$V = sprintf("%0.1f", $p_best->{'sy_vmag'});
-    } elsif ($p_best->{'sy_gaiamag'} ne '') {
-	$V = sprintf("%0.1f", $p_best->{'sy_gaiamag'});
+    if ($pars->{'sy_vmag'} ne '') {
+	$V = sprintf("%0.1f", $pars->{'sy_vmag'});
+    } elsif ($pars->{'sy_gaiamag'} ne '') {
+	$V = sprintf("%0.1f", $pars->{'sy_gaiamag'});
 	$p_best->{'comment'} .= " Mag is Gaia G. ";
     } else {
 	$V = -99; 
@@ -265,51 +290,57 @@ while ($i < $n_good) {
     
     # Also use depth from that file if we don't already have it: 
     if ($p_best->{'pl_trandep'} eq '') { 
-	if ($p_best->{'pl_ratror'} ne '') {	
+	if ($pars->{'pl_trandep'} ne '') {	
+	    $p_best->{'pl_trandep'} = $pars->{'pl_trandep'};
+	} elsif ($pars->{'pl_ratror'} ne '') {	
 	    # Use tabulated planet-star radius ratio, convert to percent: 
-	    $p_best->{'pl_trandep'} = 100 * ($p_best->{'pl_ratror'})**2;
-	} elsif (($p_best->{'pl_radj'} ne '') and ($p_best->{'st_rad'} ne '')) {	
+	    $p_best->{'pl_trandep'} = 100 * ($pars->{'pl_ratror'})**2;
+	} elsif (($pars->{'pl_radj'} ne '') and ($pars->{'st_rad'} ne '')) {	
 	    # Calculate and use planet-star radius ratio, convert to percent: 
-	    $p_best->{'pl_trandep'} = 100 * ($p_best->{'pl_radj'}*R_jup/($p_best->{'st_rad'}*R_sun))**2;
+	    $p_best->{'pl_trandep'} = 100 * ($pars->{'pl_radj'}*R_jup/($pars->{'st_rad'}*R_sun))**2;
 	}      
     }
 
     if ($p_best->{'pl_trandur'} eq '') {
-	# Didn't find it there, loop over other entries to see if
-	# we can find one with a duration. 
-	my $dur_found = 0;
-	my @planet_list = @p_list;
-	while ((not $dur_found) and (scalar(@planet_list) > 0)) {
-	    $p = pop @planet_list;
-	    if ($p->{'pl_trandur'} ne '') {
-		$p_best->{'pl_trandur'} = $p->{'pl_trandur'};
-		$dur_found = 1;
-	    }
-	}
-	if (not $dur_found) {
-	    # Try again, now with estimating duration from other
-	    # parameters. 
-	    @planet_list = @p_list;
+	# First try the 'default params' file: 
+	if  ($pars->{'pl_trandur'} ne '') {	
+	    $p_best->{'pl_trandur'} = $pars->{'pl_trandur'};
+	} else {
+	    # Didn't find it there, loop over other entries to see if
+	    # we can find one with a duration. 
+	    my $dur_found = 0;
+	    my @planet_list = @p_list;
 	    while ((not $dur_found) and (scalar(@planet_list) > 0)) {
 		$p = pop @planet_list;
-		my ($duration, $status, $comment) = estimate_duration($p);
-		if ($status) {
-		    $p_best->{'pl_trandur'} = $duration;
-		    $p_best->{'comment'} .= $comment;
+		if ($p->{'pl_trandur'} ne '') {
+		    $p_best->{'pl_trandur'} = $p->{'pl_trandur'};
 		    $dur_found = 1;
 		}
 	    }
 	    if (not $dur_found) {
-		# Could not get duration at all! 
-		if ($DEBUG) {
-		    print STDERR "### Could not get duration for $p_best->{'pl_name'}!\n";
+		# Try again, now with estimating duration from other
+		# parameters. 
+		@planet_list = @p_list;
+		while ((not $dur_found) and (scalar(@planet_list) > 0)) {
+		    $p = pop @planet_list;
+		    my ($duration, $status, $comment) = estimate_duration($p);
+		    if ($status) {
+			$p_best->{'pl_trandur'} = $duration;
+			$p_best->{'comment'} .= $comment;
+			$dur_found = 1;
+		    }
 		}
-		next PLANETS;
-	    }
+		if (not $dur_found) {
+		    # Could not get duration at all! 
+		    if ($DEBUG) {
+			print STDERR "### Could not get duration for $p_best->{'pl_name'}!\n";
+		    }
+		    next PLANETS;
+		}
 
+	    }
 	}
     }
-
 
     # Just to make what's below less verbose: 
     $p = $p_best;
