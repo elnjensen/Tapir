@@ -361,7 +361,7 @@ while ($i < $n_good) {
 	$depth_ppt_string = sprintf('%0.1f', $depth_ppt);
     }
 
-    $duration_hours = sprintf('%0.2f', 24. * $p->{'pl_trandur'});
+    $duration_hours = sprintf('%0.2f', $p->{'pl_trandur'});
     
     # RA and Dec strings use hms and dms, change to colons for those
     # in between, strip trailing 's': 
