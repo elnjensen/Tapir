@@ -394,6 +394,12 @@ while ($i < $n_good) {
 
     $duration_hours = sprintf('%0.2f', $p->{'pl_trandur'});
     
+    # Short term hack/fix until NExSci fixes a coordinate rounding
+    # bug: 
+    if ($p->{'rastr'} =~ /60.00s/) {
+	$p->{'rastr'} =~ s/60.00s/59.99s/;
+    }
+
     # RA and Dec strings use hms and dms, change to colons for those
     # in between, strip trailing 's': 
     $p->{'rastr'} =~ s/[hmd]/:/g;
