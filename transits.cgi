@@ -536,14 +536,22 @@ input[type=submit] {
  JPGs</a> or using <a href="aladin_finder.html">Aladin Lite</a>) and <a
  href="https://astro.swarthmore.edu/airmass.cgi">airmass plots</a> for any target.)  </p>
 
-<p style="color:purple"> 
+<span style="color:purple"> 
 <em> 
-Latest update (March 2022): Targets for <a
+Latest updates:<br> 
+<ul>
+<li> May 2022: The NASA Exoplanet Archive target list below is (finally)
+    again up-to-date with the latest planets released.
+</li>
+<li>
+March 2022: Targets for <a
 href="https://exoplanets.nasa.gov/exoplanet-watch/about-exoplanet-watch/overview/"
 target='_blank'>Exoplanet Watch</a> are now
     included.  
+</li>
+</ul>
 </em>
-</p>
+</span>
 
 <FORM METHOD="GET" ACTION="print_transits.cgi"> 
 
