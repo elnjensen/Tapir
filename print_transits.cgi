@@ -2239,12 +2239,17 @@ sub get_eclipses {
         $eclipse{obs_start_utc} = sprintf("%s %s",
 				       $obs_start_time->ymd, 
 				       $obs_start_time->hm);
+        $eclipse{obs_start_jd} = sprintf("%0.4f", 
+             DateTime::Format::Epoch::JD->format_datetime($obs_start_time) - 2450000);
 
 
         $obs_end_time->set_time_zone('UTC');
         $eclipse{obs_end_utc} = sprintf("%s %s",
 				       $obs_end_time->ymd, 
 				       $obs_end_time->hm);
+        $eclipse{obs_end_jd} = sprintf("%0.4f", 
+             DateTime::Format::Epoch::JD->format_datetime($obs_end_time) - 2450000);
+
 
         $eclipse{single_object} = $single_object;
         $eclipse{tess} = $tess;
