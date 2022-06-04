@@ -219,7 +219,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
        document.getElementById("vmax").value= vmax[i];
        document.getElementById("depth_min").value = depth[i];
 
-   }
+   };
 
    /* Scroll the comment boxes on initial load. */ 
    scroll_comments();
@@ -266,6 +266,8 @@ Extra stylesheet below modifies the default dataTables one in a few --
        });
    reload_colvis_button();
    window.unobservable_showing = true;
+
+     // -----  Functions for searching/filtering the table . -------- //
 
    $.fn.dataTable.ext.search.push(
     function( settings, searchData, dataIndex ) {
@@ -319,17 +321,253 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	}
     });
 
+     // -----  End of functions for searching/filtering the table . -------- //
+
+
      /* Insert code in custom search toolbar */ 
-     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="5" style="width: 3.5em" id="depth_min"> ppt <span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
+     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="5" style="width: 3.5em" id="depth_min"> ppt &nbsp; <span class="with_tooltip" title="" id="overlapSpinner">Overlap (min.):&nbsp;<input type="number" step="1" value="0" style="width: 3.5em" id="overlapTol"></span><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
  
      $('#vmax').on("change keyup", function() {
-        table.draw();
+	     table.draw();
+	     deselectHiddenRows();
     } );
 
      $('#depth_min').on("change keyup", function() {
-        table.draw();
+	     table.draw();
+	     deselectHiddenRows();
     } );
 
+     $('#transitFracSlider').on("change keyup", function() {
+	     table.draw();
+	     deselectHiddenRows();
+    } );
+
+   /* Code for dealing with selected rows */
+
+     // When the overlap is changed, check the selected rows to make sure all can 
+     // still be observed.  Redrawing the table forces the search criteria to be applied. 
+     $('#overlapTol').on("change keyup", function() {
+	     let valid = validateSelectedSet();
+	     styleOverlappingRows(valid);
+	     if (!valid) {
+		 alert('The events selected are no longer all observable given the reduced overlap tolerance selected.');
+	     }
+	     table.draw();
+	 } );
+
+     // Arrays of start and end times of selected rows: 
+     var selectedStart = []; 
+     var selectedEnd = []; 
+     var selectedRows = [];
+
+     var populateTimes = function() {
+	 /* Get start and end observation times of selected cells: */
+	 selectedStart = []; 
+	 selectedEnd = []; 
+	 selectedRows = []; 
+	/* Get the index for *original* col even if reordered: */
+	 var colInd=table.colReorder.transpose( 0 );
+
+	 for (rowInd of Array.from(table.rows( { selected: true } ).indexes())) {
+		 var node = table.cell(rowInd, colInd).node();
+		 selectedStart.push(parseFloat(node.attributes['data-obs-start'].value));
+		 selectedEnd.push(parseFloat(node.attributes['data-obs-end'].value));
+		 selectedRows.push(rowInd);
+	 };
+     };
+
+     var toggleSelectTooltips = function(box){
+	 tippy(box);
+	 if( box.checked ){
+	     box._tippy.setContent('De-select to show overlapping events')
+	 } else {
+	     box._tippy.setContent('Select to hide overlapping events');
+	 }
+     };
+
+     var overlappingEvents = function(start1, end1, start2, end2, overlapTol) {
+	 /* Determine whether two events overlap by more than the allowed 
+	    tolerance.  Return true if events are mutually overlapping, 
+	    false if not (in which case both can be observed). All times
+	    assumed to be in the same units. If overlapTol is negative, 
+	    that enforces extra time between events for them to be 
+	    considered not overlapping. */
+	 let overlap = (
+	       // Start1 is within event2 interval
+		((start1 >= start2) && 
+		(start1 <= end2 - overlapTol)) || 
+		// End1 is within event2 interval
+		((end1 >= start2 + overlapTol) && 
+		 (end1 <= end2)) ||
+		// Event1 fully spans event2
+		((start1 <= start2) && 
+		 (end1 >= end2))
+		    );
+	 return overlap;
+     };
+     
+     var validateSelectedSet = function() {
+	 /* Take the set of selected events and make sure that they 
+	    are mutually observable, given the current settings for 
+	    allowed overlap.  Return true if valid, false if not. */
+	var count = selectedStart.length;
+	if (count == 0) {
+	    // No rows selected, all should be visible.
+	    return true;
+	};
+
+	/* Get the tolerance for overlap */
+	var tol_string = document.getElementById("overlapTol");
+	var tolMinutes = parseFloat(tol_string.value);
+	const tol = tolMinutes/(60*24); // Overlap allowed, in days
+
+	// Loop over all pairs of events and check them against each other: 
+	for (let i = 0; i < count; i++) {
+	    start1 = selectedStart[i];
+	    end1 = selectedEnd[i];
+	    for (let j = i+1; j < count; j++) {
+		start2 = selectedStart[j];
+		end2 = selectedEnd[j];
+		if (overlappingEvents(start1, end1, start2, end2, tol)) {
+		    return false;
+		}
+	    }
+	}
+
+	// If no overlap found above, set is valid: 
+	return true;
+     }
+	 
+     var overlappingRows = function() {
+	 /* Take the set of selected events and return an 
+	    array of row indices of any rows that overlap.
+	    If there is no overlap, return empty array. 
+	 */
+	var count = selectedStart.length;
+	var overlapInds = [];
+	if (count == 0) {
+	    // No rows selected, all should be visible.
+	    return overlapInds;
+	};
+
+	/* Get the tolerance for overlap */
+	var tol_string = document.getElementById("overlapTol");
+	var tolMinutes = parseFloat(tol_string.value);
+	const tol = tolMinutes/(60*24); // Overlap allowed, in days
+
+	// Loop over all pairs of events and check them against each other: 
+	for (let i = 0; i < count; i++) {
+	    start1 = selectedStart[i];
+	    end1 = selectedEnd[i];
+	    for (let j = i+1; j < count; j++) {
+		start2 = selectedStart[j];
+		end2 = selectedEnd[j];
+		if (overlappingEvents(start1, end1, start2, end2, tol)) {
+		    overlapInds.push(selectedRows[i],selectedRows[j]);
+		}
+	    }
+	}
+
+	return overlapInds;
+     }
+	 
+     var styleOverlappingRows = function(valid) {
+	 /* Apply or remove the class that uses row shading to indicate
+	    whether the currently selected set is valid or not.
+	    The 'valid' parameter is a boolean (generally
+	    returned from validateSelectedSet) that indicates
+	    whether or not there is overlap of selected events.
+	 */ 
+	 if (valid) {
+	     $('tr').removeClass('overlapping');
+	 } else {
+	     table.rows(overlappingRows()).nodes().to$().addClass('overlapping');
+	 };
+     };
+
+     table.on('select', function ( event, dt, type, indexes ) {
+	   populateTimes();
+	   $('.observation-select').each(function() {
+		   toggleSelectTooltips(this)
+		       });
+	   styleOverlappingRows(validateSelectedSet());
+	   table.draw();
+	  });
+
+     table.on('deselect', function ( event, dt, type, indexes ) {
+	   populateTimes();
+	   $('.observation-select').each(function() {
+		   toggleSelectTooltips(this)
+		       });
+	   styleOverlappingRows(validateSelectedSet());
+	   table.draw();
+	  });
+
+     // Search function that selects compatible rows: 
+     $.fn.dataTable.ext.search.push(
+      function( settings, searchData, dataIndex ) {
+	var count = selectedStart.length;
+	if (count == 0) {
+	    // No rows selected, all should be visible.
+	    return true;
+	};
+
+	// Keep selected rows visible: 
+	if (table.row(dataIndex, { selected: true }).any()) {
+	    return true;
+	};
+
+	/* Get the tolerance for overlap */
+	var tol_string = document.getElementById("overlapTol");
+	var tolMinutes = parseFloat(tol_string.value);
+
+	const tol = tolMinutes/(60*24); // Overlap allowed, in days
+
+	/* Get the index for *original* col even if reordered: */
+	var colInd=table.colReorder.transpose( 0 );
+
+	var node = table.cell(dataIndex, colInd).node();
+	var eventStart = parseFloat(node.attributes['data-obs-start'].value);
+	var eventEnd = parseFloat(node.attributes['data-obs-end'].value);
+
+	for (let i = 0; i < count; i++) {
+	    if (overlappingEvents(eventStart, eventEnd, 
+				  selectedStart[i], selectedEnd[i], tol)) {
+		return false;
+	    }
+	}
+	return true;
+    });
+
+
+     // On initial load, clear any selected checkboxes for row selection
+     // and set up the tooltips: 
+     $('.observation-select').each(function() {
+        this.checked = false;
+	toggleSelectTooltips(this);
+      });
+
+     /* When other search methods hide rows, make sure that filtered
+	rows get deselected.  Notify the user if this happens. 
+        This function does not explicitly re-draw the table (though the 
+        deselect event might). 
+     */
+     var deselectHiddenRows = function() {
+	 selectedHidden = table.rows( { selected: true, search: 'removed' });
+	 if (selectedHidden.count() > 0) {
+	     alert('Some of your previously selected events have been hidden'+ 
+		   ' by your other filtering choices.\n\nThey will now be de-selected.'); 
+	     // Make sure checkbox gets unchecked:
+	     selectedHidden.nodes().to$().find('input.observation-select').each(
+                 function(){this.checked=false});
+	     // In case any had been overlapping:
+	     selectedHidden.nodes().to$().removeClass('overlapping');
+	     // Then actually de-select rows:
+	     selectedHidden.deselect();
+	 }
+     };
+
+     /* End of code related to row selection */
 
      /* Offset floating table headers so toolbar shows: */
    table.fixedHeader.headerOffset( $('#toolbar').outerHeight()+ 6.5 ); 
@@ -946,12 +1184,13 @@ NAME="max_airmass">">Airmass plot</a>
 
   /* Run this stuff at the very end to make sure the element has been created already */ 
 
-  $(document).ready(function(){
+$(document).ready( function(){
 
     var slider = document.getElementById("transitFracSlider");
     var output = document.getElementById("transitFrac");
 
     if (slider) {
+	console.log('Setting slider properties. in doc.ready.');
        slider.oninput = function() {
    	   output.innerHTML = this.value;
 	   $('#target_table').DataTable().draw();
@@ -959,6 +1198,12 @@ NAME="max_airmass">">Airmass plot</a>
        /* Start at zero */ 
        slider.value = 0;
        output.innerHTML = slider.value;
+    }
+
+    var overlapSpinner = document.getElementById("overlapSpinner");
+    if (overlapSpinner) {
+       tippy(overlapSpinner);
+       overlapSpinner._tippy.setContent('Allowed overlap (minutes) for selected events to be considered observable.  Negative values indicate <em>extra</em> time required between selected observations.');
     }
 
     set_default_filters();
@@ -969,6 +1214,7 @@ NAME="max_airmass">">Airmass plot</a>
     /* Make sure initial search values take effect: */
     $('#target_table').DataTable().draw();
 
-      });
+
+    });
 
 </script>
