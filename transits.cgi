@@ -540,6 +540,13 @@ input[type=submit] {
 <em> 
 Latest updates:<br> 
 <ul>
+<li> June 2022: You can now plan your night of observing by selecting
+    the transits you plan to observe, which will hide any events that
+    overlap with the selected event(s) (taking into account the
+					out-of-transit baseline),
+    leaving only those that don't overlap.  Use the checkboxes next to
+the object name.
+</li>
 <li> May 2022: The NASA Exoplanet Archive target list below is (finally)
     again up-to-date with the latest planets released.
 </li>
