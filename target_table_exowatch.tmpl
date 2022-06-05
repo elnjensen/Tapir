@@ -325,7 +325,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
 
 
      /* Insert code in custom search toolbar */ 
-     $("#toolbar").html('&nbsp; &nbsp;&nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="5" style="width: 3.5em" id="depth_min"> ppt &nbsp; <span class="with_tooltip" title="" id="overlapSpinner">Overlap:&nbsp;<input type="number" step="1" value="0" style="width: 3.5em" id="overlapTol"> m.</span><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
+     $("#toolbar").html('&nbsp; &nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="5" style="width: 3.5em" id="depth_min"> ppt &nbsp; &nbsp; <span class="with_tooltip" title="" id="overlapSpinner">Overlap:&nbsp;<input type="number" step="1" value="0" style="width: 3.5em" id="overlapTol"> m.</span><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
  
      $('#vmax').on("change keyup", function() {
 	     table.draw();
@@ -581,6 +581,9 @@ Extra stylesheet below modifies the default dataTables one in a few --
 </script>
 
 <style>
+
+  /* Width of search box above table: */
+    .dataTables_filter input { width: 100px }
 
   /* Style for selected rows when other parameter changes have 
       made the current selections overlap.
