@@ -420,8 +420,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	   table.draw();
 	   // After filtering, try to make the just-selected event (which 
 	   // had just been under the cursor) still be visible: 
-	   selected = document.getElementsByClassName("selected");
-	   selected[selected.length - 1].scrollIntoView({block: "end"});
+	   table.row(indexes[0]).node().scrollIntoView({block: "center"});
 	 });
 
      table.on('deselect', function ( event, dt, type, indexes ) {
