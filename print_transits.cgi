@@ -1757,8 +1757,8 @@ sub get_eclipses {
 	# If ingress is observable, we'll tack on some previous
         # baseline to see how much more we can observe.  If not, we
         # just search forward from ingress.
-	# Right now hard-coding the min desired baseline as 1 hour: 
-	my $desired_baseline = max ($baseline_hrs + $midtime_uncertainty_hours, 1);
+	# Minimum value allowed here is 30 minutes or 0.5 hours: 
+	my $desired_baseline = max ($baseline_hrs + $midtime_uncertainty_hours, 0.5);
 
 	my $max_baseline = $start_is_observable ? $desired_baseline : 0;
 
