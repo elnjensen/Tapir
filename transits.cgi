@@ -901,22 +901,23 @@ Only show transits with an elevation (in degrees) of at least:
 
 <h4> Hour angle: </h4>
 <div class="indent">
- <p> Only show transits with hour angle between <INPUT NAME="minimum_ha" VALUE="$minimum_ha" size="3"/> 
-and <INPUT NAME="maximum_ha" VALUE="$maximum_ha" size="3"/> hours.  Constraints are evaluated only at ingress and egress.  Unspecified HA constraints default to &plusmn;12 (i.e. no constraint). 
+ <p> Only show transits with hour angle between <INPUT NAME="minimum_ha" VALUE="$minimum_ha" size="2"/> 
+and <INPUT NAME="maximum_ha" VALUE="$maximum_ha" size="2"/> hours.  Constraints are evaluated only at ingress and egress.  Unspecified HA constraints default to &plusmn;12 (i.e. no constraint). 
 </p>
 </div>
 
 
 <h4> Out-of-transit baseline: </h4>
 <div class="indent">
- <p> Also calculate observability (with above elevation, daylight, and
-     HA constraints) at points up to 
+ <p> Observability (with above elevation, daylight, and
+     HA constraints) will also be shown at points up to 
      <INPUT NAME="baseline_hrs" VALUE="$baseline_hrs" size="2"/>
     hours before ingress and after egress to show how much 
-    out-of-transit baseline can be observed. 
+    out-of-transit baseline can be observed.  (This can be set to a
+    minimum of 0.5 hours, but an hour or more is recommended.)
 </p>
 <p style="padding-left: 24px; text-indent: -24px;"> <input
-    type="checkbox" name="show_unc" value="1" $unc_checked> Extend baseline by ephemeris uncertainty. (If baseline above is zero, this option will display baseline of uncertainty only.) </p>
+    type="checkbox" name="show_unc" value="1" $unc_checked> Extend baseline by ephemeris uncertainty.</p>
 </div>
 
 <h4> Space observing: </h4> 
