@@ -73,4 +73,7 @@ foreach my $a (@$csv_lines) {
 }
     
 # Finally, write this out to a CSV file: 
-my $status = Text::CSV::csv(in => \@output_lines, out => *STDOUT); 
+my $status = Text::CSV::csv(in => \@output_lines, 
+			    out => *STDOUT,
+			    encoding => "UTF-8",
+); 

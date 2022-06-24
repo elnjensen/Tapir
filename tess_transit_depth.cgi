@@ -81,7 +81,7 @@ if ($name =~ /^\s*TIC\s*([\d.]+)\s*$/i) {
 # }
 
 my @lines = @{ Text::CSV::csv(in => '/home/httpd/html/transits/toi_targets.csv', 
-			      encoding => "UTF8",
+			      encoding => "UTF-8",
 			      headers => "auto",
 			      filter => \%filter,      
 		   )};
