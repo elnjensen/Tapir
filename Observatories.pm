@@ -230,6 +230,12 @@ our %observatories_western_north_america = (
               timezone_integer => 7,
               timezone => 'MST7MDT',
           },
+
+          "Sierra Remote Observatories, CA" => {
+              latitude => 37.07055,
+              longitude => -119.4128,
+	      timezone => 'America/Los_Angeles',
+          },
 					   );
 
 
