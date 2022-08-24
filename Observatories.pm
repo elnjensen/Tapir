@@ -618,6 +618,13 @@ our %observatories_eastern_us = (
 	       timezone_integer => 5,
 	       timezone => 'EST5EDT',
 	   },
+
+	   "Observatoire du Mont-Mégantic, Québec" => {
+	       latitude => 45.455683,
+	       longitude => -71.1521,
+	       timezone_integer => 5,
+	       timezone => 'America/Toronto',
+	   },
 				);
 
 

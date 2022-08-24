@@ -42,6 +42,8 @@ use warnings;
 # webserver log file:
 use CGI::Carp qw(fatalsToBrowser);
 
+# Some observatory names have non-ASCII characters: 
+use utf8;
 
 use Astro::Coords;
 use Astro::Telescope;
@@ -58,7 +60,7 @@ use DateTime::Set;
 use DateTime::Format::Epoch::JD;
 
 use HTML::Template::Expr;
-use CGI;
+use CGI qw/ -utf8 /;
 use CGI::Cookie;
 use URI::Escape;
 use HTML::Entities;
