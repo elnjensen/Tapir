@@ -33,6 +33,8 @@ use JSON qw(decode_json);
 use warnings;
 use strict;
 
+# Some observatory names have non-ASCII characters: 
+use utf8;
 use Observatories qw(%observatories_asia
 		     %observatories_western_north_america
 		     %observatories_australia
