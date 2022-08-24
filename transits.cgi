@@ -566,6 +566,7 @@ target='_blank'>Exoplanet Watch</a> are now
 
 <h3>Target list:</h3>
 <div class="indent p-style">
+(All target lists are updated nightly.)<br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="0" onclick="show_hide(this.value,'1','ephem_block')"
 Checked
 /> NASA Exoplanet Archive database ($n_planets planets; <a
