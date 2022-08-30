@@ -614,7 +614,7 @@ if ($start_date_string =~ /^\s*today\s*$/i) {
 	# DD-MM-YYYY format:
 	my $hint = '';
 	if ($month > 12) {
-	    $hint = "Maybe you listed days before months?. ";
+	    $hint = "Maybe you listed days before months?";
 	} 
 	die "Could not parse date [$start_date_string]; " 
 	    . "must be 'today' or in MM-DD-YYYY format. $hint";
