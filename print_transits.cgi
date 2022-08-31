@@ -900,6 +900,12 @@ my $n_eclipses = 0;
 # If different field names are used in the input file, name
 # reassignments can be given below (as with RA and Dec here).
 
+# Our list of references to targets we want to search, i.e. those
+# that survive any cuts on target name, magnitude, etc., 
+#  and have sufficient data: 
+
+my @targets_to_search = ();
+
 TARGET_LOOP:
 foreach my $target_ref (@lines) {
   
@@ -1033,20 +1039,7 @@ foreach my $target_ref (@lines) {
 	  next TARGET_LOOP;
       }
 
-      my ($eclipse_time_ref,$eclipse_info_ref) = get_eclipses(\%target_info);
-
-      # Take the references to the returned lists of eclipse strings and
-      # times, and add those arrays to our growing lists:
-      push @eclipse_times, @$eclipse_time_ref;
-      push @eclipse_info, @$eclipse_info_ref;
-
-      # Check to see if we have reached the limit of how many events
-      # to find; if so set a flag and stop searching: 
-      $n_eclipses = scalar @eclipse_times;
-      if ($n_eclipses > $max_eclipses_to_print) {
-	  $reached_max_eclipses = 1;
-	  last TARGET_LOOP;
-      }
+      push @targets_to_search, \%target_info;
   }
 
   # Now we also need to check for observability for "any time"
@@ -1064,6 +1057,67 @@ foreach my $target_ref (@lines) {
     
 }  # end of TARGET_LOOP loop over input file
 
+# How many viable targets:
+printf("Searched %d targets.</br>\n",  scalar @targets_to_search);
+
+
+# Here is where we could parallelize if we want. 
+# Probably makes sense to split input list into roughly 
+# equal-sized chunks and parse out *lists* of targets in parallel, 
+# to reduce overhead from the inter-process communication for 
+# spawning one thread per target.  But could test. 
+# Template code from Perl Maven example: 
+
+# my $forks = 7;
+# use Parallel::ForkManager;
+# my $pm = Parallel::ForkManager->new($forks);
+# # Hash that will hold the results: 
+# my %results;
+
+# $pm->run_on_finish( sub {
+#     my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+#     my $key = $data_structure_reference->{key};
+#     $results{$key} = $data_structure_reference->{result};
+# });
+
+# # Use a C-style for loop here to get the counter: 
+# for (my $i=0; $i <= $#targets_to_search; $i++) {
+#     # Will this skip one target?
+#     my $pid = $pm->start and next;
+#     my @return_vals = get_eclipses($targets_to_search[$i]);
+#     #my $eclipse_times = @{$return_vals[0]};
+#     #print "$i, $pid, $eclipse_times</br>\n";
+#     # Returned values is a two-element list; return a 
+#     # reference to that array:
+#     $pm->finish(0, { result => \@return_vals, key => $i });
+# }
+# $pm->wait_all_children;
+ 
+# # Now need to unpack results hash
+# for (my $i=0; $i <= $#targets_to_search; $i++) {
+#    my ($eclipse_time_ref,$eclipse_info_ref) = @{$results{$i}};
+#    push @eclipse_times, @$eclipse_time_ref;
+#    push @eclipse_info, @$eclipse_info_ref;
+# }
+
+SEARCH_LOOP:
+# Now actually do the searching:
+foreach my $target_info_ref (@targets_to_search) {
+    my ($eclipse_time_ref,$eclipse_info_ref) = get_eclipses($target_info_ref);
+
+    # Take the references to the returned lists of eclipse strings and
+    # times, and add those arrays to our growing lists:
+    push @eclipse_times, @$eclipse_time_ref;
+    push @eclipse_info, @$eclipse_info_ref;
+
+    # Check to see if we have reached the limit of how many events
+    # to find; if so set a flag and stop searching: 
+    $n_eclipses = scalar @eclipse_times;
+    if ($n_eclipses > $max_eclipses_to_print) {
+	$reached_max_eclipses = 1;
+	last SEARCH_LOOP;
+    }
+}
 
 # All done - sort, then print the output!
 
