@@ -1058,6 +1058,25 @@ foreach my $target_ref (@lines) {
     
 }  # end of TARGET_LOOP loop over input file
 
+# Print a message showing how many targets we are searching; if 
+# none at all, just bail out now: 
+if ($print_html == 1) {
+    my $n_targets = scalar @targets_to_search;
+    my $constraint_msg = "(on name, V mag, depth, etc.).  ";
+    if ($n_targets == 0) {
+	print "<h2>No targets match your constraints $constraint_msg";
+	print "Check your inputs.\n</h2>";
+	print $q->end_html;
+	exit;
+    } else {
+	if ($n_targets == 1) {
+	    print "<p>Only 1 target matches your constraints $constraint_msg";
+	} else {
+	    print "<p>$n_targets targets match your constraints $constraint_msg";
+	}
+	print "Searching for observable transits...</p>\n";
+    }
+}
 
 # For parallelizing, we split the input target list into roughly 
 # equal-sized chunks and parse out *lists* of targets in parallel.
@@ -1067,8 +1086,9 @@ foreach my $target_ref (@lines) {
 # Number of forks we'll use; we have 8 cores, so leave one free: 
 my $forks = 7;
 # Divide the target array into chunks; make sure we don't
-# have more chunks than subprocesses: 
-my $chunk_size = int(scalar @targets_to_search / ($forks - 1));
+# have more chunks than subprocesses, but also that we don't
+# end up with zero chunk size if target list is small:
+my $chunk_size = max(5, int(scalar @targets_to_search / ($forks - 1)));
 my $pm = Parallel::ForkManager->new($forks);
 # Hash that will hold the results: 
 my %results;
@@ -1100,22 +1120,26 @@ my $i = 0;
 foreach my $chunk_ref (@chunk_list) {
     $i++;
     my $pid = $pm->start;
-    # Parent process has PID > 0, and goes on to next part of loop; 
-    # child processes (PID = 0) continue, and do the work: 
-    next if ($pid != 0);
-    # Lists to save results from this set of targets: 
-    my @eclipse_times_partial = ();
-    my @eclipse_info_partial = ();
-    # Process a chunk of the target list: 
-    foreach my $target_ref ( @{$chunk_ref} ) {
-       my ($eclipse_times_ref, $eclipse_info_ref) = get_eclipses($target_ref);
-       push @eclipse_times_partial, @{$eclipse_times_ref};
-       push @eclipse_info_partial, @{$eclipse_info_ref};
+    # Now we have forked, and have two processes entering at this 
+    # part of the code (if the fork was successful).
+    # Parent process has PID > 0, and falls through to next part of loop; 
+    # child process has PID == 0, so continues to do this chunk.
+    # If the fork failed, PID is undefined. 
+    if ((defined $pid) and ($pid == 0)) {
+	# Lists to save results from this set of targets: 
+	my @eclipse_times_partial = ();
+	my @eclipse_info_partial = ();
+	# Process a chunk of the target list: 
+	foreach my $target_ref ( @{$chunk_ref} ) {
+	    my ($eclipse_times_ref, $eclipse_info_ref) = get_eclipses($target_ref);
+	    push @eclipse_times_partial, @{$eclipse_times_ref};
+	    push @eclipse_info_partial, @{$eclipse_info_ref};
+	}
+	# Put references to these lists into an array: 
+	my @return_vals = (\@eclipse_times_partial, \@eclipse_info_partial);
+	# And return a reference to that array, keyed by our integer i:
+	$pm->finish(0, { result => \@return_vals, key => $i });
     }
-    # Put references to these lists into an array: 
-    my @return_vals = (\@eclipse_times_partial, \@eclipse_info_partial);
-    # And return a reference to that array, keyed by our integer i:
-    $pm->finish(0, { result => \@return_vals, key => $i });
 }
 $pm->wait_all_children;
  
