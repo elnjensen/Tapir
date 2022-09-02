@@ -874,8 +874,6 @@ my @error_names_list = ();
 # Flag to indicate whether we exit the loop after hitting a limit on
 # how many events to print: 
 my $reached_max_eclipses = 0;
-# Eclipses found so far: 
-my $n_eclipses = 0;
 
 # Now, loop over the lines of the input, assuming one target per
 # line.  Lines read from CSV are hash references, with each hash keyed
