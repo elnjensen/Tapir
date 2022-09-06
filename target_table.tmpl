@@ -1,29 +1,31 @@
 <!-- Library for better tooltips -->
 <script  type="text/javascript" src="https://unpkg.com/tippy.js@3/dist/tippy.all.min.js"></script>
 
-
-<!-- Current there are issues with col-reorder (cr) >= 1.5.6, stay at 1.5.5
-     Also rowGroup (rg) 1.2.0 changes styling options, stay at 1.1.4
--->
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.12.1/b-2.2.3/b-colvis-2.2.3/cr-1.5.0/fh-3.2.4/r-2.3.0/rg-1.1.4/sl-1.4.0/datatables.min.css"/>
- 
-<script type="text/javascript"
-	src="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.12.1/b-2.2.3/b-colvis-2.2.3/cr-1.5.0/fh-3.2.4/r-2.3.0/rg-1.1.4/sl-1.4.0/datatables.min.js"></script>
-
-
 <!-- Created from https://datatables.net/download/, with options:
 Datables
 JQuery 3 + DataTables
 Buttons
 Column Visibility
 ColReorder
-FixedColumns
 FixedHeader
 Responsive
 RowGroup
 Select
 -->
 
+<!-- Latest versions as of 2022-07-27
+except: 
+
+use Select 1.3.4 rather than 1.4.0: error about undefined
+     object when reordering rows
+
+use RowGroup 1.1.4 
+ -->
+
+<!-- 09/03/2022 - revert to old versions for now -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.css"/>
+ 
+<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.js"></script>
 
 <!--
 Extra stylesheet below modifies the default dataTables one in a few --
@@ -45,14 +47,18 @@ Extra stylesheet below modifies the default dataTables one in a few --
 
 <script type="text/javascript">
   $(document).ready( function () {
-     var table = $('#target_table').DataTable( {
+     table = $('#target_table').DataTable( {
           paging: false,
           fixedHeader: true,
+	  /* see https://datatables.net/forums/discussion/73032 */
+	  orderClasses: false,
           responsive: true,
 	  select: {
 	  	 style: 'multi',
-		 selector: 'input:checkbox',
+		 selector: 'input:checkbox.observation-select',
 	     },
+          responsive: true,
+	  colReorder: { realtime: false, fixedColumnsLeft: 2},
           /* Set the DOM with DIVs to help w/ alignment. */
           dom: '<"right"B><"sticky"<"clear"f><"#toolbar">>tip',
           buttons: [
@@ -97,7 +103,8 @@ Extra stylesheet below modifies the default dataTables one in a few --
                          { "orderable": false, 
                            "targets": [ 1 ] },
 			 /* These control the order in which columns get hidden */ 
-			 /* on narrower screens.  Lower priorities are hidden first. */ 
+			 /* on narrower screens.  Higher-numbered priorities */
+	                 /* are hidden first. */ 
 			 /* Date, Name, V, % obs */
      { responsivePriority: 1, targets: [0,1,2,7] },
 			 /* Start/end, Duration, BJD, Elev., Depth */
@@ -119,15 +126,11 @@ Extra stylesheet below modifies the default dataTables one in a few --
           order: [[ 5, "asc" ]],
 	  rowGroup: { dataSrc: '0.display',
 		      startRender: function ( rows, group ) {
-		                 // Get the index for *original* col 0 even if reordered:
-		                 let idx=rows.colReorder.transpose( 0 );
 				 let node = rows.nodes()[0];
-				 let daylabel= node.cells[idx].getAttribute('data-header-label');
+				 let daylabel= node.cells[0].getAttribute('data-header-label');
 				 return daylabel;
 		             }
 	     },
-          colReorder: true,
-	  colReorder: { realtime: false, fixedColumnsLeft: 2},
 	 } );
 
 
@@ -412,7 +415,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	   // After filtering, try to make the just-selected event (which 
 	   // had just been under the cursor) still be visible: 
 	   table.row(indexes[0]).node().scrollIntoView({block: "center"});
-	 });
+	  });
 
      table.on('deselect', function ( event, dt, type, indexes ) {
 	   populateTimes();
@@ -506,8 +509,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
     .dataTables_filter input { width: 100px }
 
   /* Style for selected rows when other parameter changes have 
-      made the current selections overlap.
-  */
+      made the current selections overlap.  */
 
   tr.overlapping, table.dataTable.display tbody tr.overlapping > .sorting_1  {
     background-color: #FF8080 !important;
@@ -684,6 +686,7 @@ PC = Planet Candidate <br />
 > 
     <TMPL_VAR NAME="sunset_local_string">    
 	<TMPL_IF NAME="use_utc">(local date)</TMPL_IF>
+</p>
   <p> <TMPL_VAR NAME="twilight_label"><br/> 
 
 <TMPL_IF NAME="use_utc">
@@ -693,7 +696,6 @@ PC = Planet Candidate <br />
   <TMPL_VAR NAME="sunset_time_local"> &ndash; <TMPL_VAR NAME="sunrise_time_local">
   (<TMPL_VAR NAME="timezone">) 
 </TMPL_IF>
-
   </p>
  </td> 
 
@@ -732,7 +734,7 @@ NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
 NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
 NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
 NAME="jd_end">&use_utc=<TMPL_VAR 
-NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">" target='_blank'>Airmass
+NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">" target="_blank">Airmass
   plot</a>,
  <a
 href="acp_plan.cgi?target=<TMPL_VAR
@@ -775,7 +777,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
    <TMPL_IF EXPR="baseline_hrs > 0"> 
      <span style="opacity:0.5;display:block;margin-bottom:6px;
        <TMPL_IF EXPR="is_daytime_pre">color:MediumVioletRed</TMPL_IF>" >
-    <TMPL_IF EXPR="use_utc">
+    <TMPL_IF NAME="use_utc">
 	 <TMPL_VAR NAME="pre_time_UTC">
     <TMPL_ELSE>
 	 <TMPL_VAR NAME="pre_time">
@@ -790,7 +792,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
     </TMPL_IF> 
       >
 
-<TMPL_IF EXPR="use_utc">
+<TMPL_IF NAME="use_utc">
    <TMPL_VAR NAME="start_time_UTC"></span>&mdash;<br/>
 <TMPL_ELSE>
    <TMPL_VAR NAME="start_time"></span>&mdash;<br/>
@@ -801,7 +803,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
     </TMPL_IF> 
     >
 
-<TMPL_IF EXPR="use_utc">
+<TMPL_IF NAME="use_utc">
    <TMPL_VAR NAME="mid_time_UTC">
 <TMPL_ELSE>
    <TMPL_VAR NAME="mid_time">
@@ -812,14 +814,14 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
         <TMPL_IF EXPR="ends_after_sunrise"> 
            style="color:MediumVioletRed" 
         </TMPL_IF> 
-  ><TMPL_IF EXPR="use_utc"><TMPL_VAR NAME="end_time_UTC"><TMPL_ELSE><TMPL_VAR NAME="end_time"></TMPL_IF>
+  ><TMPL_IF NAME="use_utc"><TMPL_VAR NAME="end_time_UTC"><TMPL_ELSE><TMPL_VAR NAME="end_time"></TMPL_IF>
 </span></span>
 
    <TMPL_IF EXPR="baseline_hrs > 0"> 
      <span style="opacity:0.5;display:block;margin-top:6px;
        <TMPL_IF EXPR="is_daytime_post">color:MediumVioletRed</TMPL_IF>" >
       &nbsp;&nbsp;&nbsp;&nbsp;
-    <TMPL_IF EXPR="use_utc">
+    <TMPL_IF NAME="use_utc">
 	 <TMPL_VAR NAME="post_time_UTC">
     <TMPL_ELSE>
 	 <TMPL_VAR NAME="post_time">
@@ -1098,7 +1100,7 @@ NAME="max_airmass">">Airmass plot</a>
 
   /* Run this stuff at the very end to make sure the element has been created already */ 
 
-$(document).ready(function(){
+window.onload = function(){
 
     var slider = document.getElementById("transitFracSlider");
     var output = document.getElementById("transitFrac");
@@ -1119,6 +1121,12 @@ $(document).ready(function(){
        overlapSpinner._tippy.setContent('Allowed overlap (minutes) for selected events to be considered observable.  Negative values indicate <em>extra</em> time required between selected observations.');
     }
 
-    });
+};
 
 </script>
+
+
+
+<p>&nbsp;</p>
+<p />
+
