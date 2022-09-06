@@ -50,9 +50,9 @@ Extra stylesheet below modifies the default dataTables one in a few --
      table = $('#target_table').DataTable( {
           paging: false,
           fixedHeader: true,
-	  /* see https://datatables.net/forums/discussion/73032 */
-	  orderClasses: false,
-          responsive: true,
+	  /* Might be useful later if we tweak selection colors:
+            see https://datatables.net/forums/discussion/73032 
+	  orderClasses: false, */
 	  select: {
 	  	 style: 'multi',
 		 selector: 'input:checkbox.observation-select',
