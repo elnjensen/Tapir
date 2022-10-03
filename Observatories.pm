@@ -236,6 +236,12 @@ our %observatories_western_north_america = (
               longitude => -119.4128,
 	      timezone => 'America/Los_Angeles',
           },
+
+          "Table Mountain Observatory, CA" => {
+              latitude => 34.38139,
+              longitude => -117.68194,
+	      timezone => 'America/Los_Angeles',
+          },
 					   );
 
 
