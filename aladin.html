@@ -12,8 +12,10 @@
 <script type='text/javascript' src='aladin-local.js' charset='utf-8'>
 </script>
 <script type='text/javascript' src='vizier_mirrors.js' charset='utf-8'></script>
-<!-- Functions for Aladin Lite finder interface. -->
-<script type='text/javascript' src='aladin-tess.js' charset='utf-8'></script>
+<!-- Functions for Aladin Lite finder interface.  The version string here is
+     present to force browsers to load the file if we make changes, and update
+     the version string here.  It is not used in the script. -->
+<script type='text/javascript' src='aladin-tess.js?version=1.11' charset='utf-8'></script>
 
 
 <!-- Some styling for aligning equations at = sign, based on
@@ -71,7 +73,7 @@ input:invalid {
 <span id="gaia-blend-group" style="white-space:nowrap;">
      &nbsp;&nbsp;
 <input type="checkbox" id="gaia" onclick="toggleElements(this)">
-<label for="gaia" id="gaia-blend-label"><span id='gaia-blends-N-sources'></span> Possibly-blending Gaia eDR3 sources within 2.5&apos; for depth 
+<label for="gaia" id="gaia-blend-label"><span id='gaia-blends-N-sources'></span> Possibly-blending Gaia DR3 sources within 2.5&apos; for depth 
 <input type="number" id="depth-input" size="5" step="0.1" min="0"
 oninput="setTimeout(changeGaiaNeighbors(this.value),200)"> ppt
 <!-- Legend symbol, initially hidden -->
@@ -86,7 +88,7 @@ oninput="setTimeout(changeGaiaNeighbors(this.value),200)"> ppt
     &nbsp;&nbsp;
 <span id="gaia-group" style="white-space:nowrap;">
 <input type="checkbox" id="gaiaAll" onclick="toggleElements(this)">
-<label for="gaiaAll">All <span id='gaia-N-sources'></span> Gaia eDR3 sources within 5&apos;
+<label for="gaiaAll">All <span id='gaia-N-sources'></span> Gaia DR3 sources within 5&apos;
 <!-- Legend symbol, initially hidden -->
 <svg width="15" height="15" viewBox="0 0 16 16" style="align: center">
   <circle id="gaiaAll-legend" r="6" cx="7.5" cy="9"
@@ -101,6 +103,31 @@ oninput="setTimeout(changeGaiaNeighbors(this.value),200)"> ppt
 <!-- Legend symbol, initially hidden -->
 <svg width="16" height="16"  viewBox="0 0 17 17">
   <polygon id="simbad-legend" points="7,4 14,16 2,16" 
+		    style="fill:none;stroke-width:2.5;stroke:none;" />
+</svg>
+</label> 
+</span>
+
+    &nbsp;&nbsp;
+<span id="eb-group" style="white-space:nowrap;">
+<input type="checkbox" id="ebs" onclick="toggleElements(this)">
+<label for="ebs"><span id='gaia-ebs-N-sources'></span> Gaia
+  EBs
+<!-- Legend symbol, initially hidden -->
+<svg width="16" height="16"  viewBox="0 0 17 17">
+  <polygon id="ebs-legend" points="7,4 14,16 2,16" 
+		    style="fill:none;stroke-width:2.5;stroke:none;" />
+</svg>
+</label> 
+</span>
+
+    &nbsp;&nbsp;
+<span id="var-group" style="white-space:nowrap;">
+<input type="checkbox" id="vars" onclick="toggleElements(this)">
+<label for="vars"> <span id='gaia-vars-N-sources'></span> Gaia vars
+<!-- Legend symbol, initially hidden -->
+<svg width="16" height="16"  viewBox="0 0 17 17">
+  <polygon id="vars-legend" points="8,2 9,2 15,8.5 9,15 8,15 2,8.5" 
 		    style="fill:none;stroke-width:2.5;stroke:none;" />
 </svg>
 </label> 
@@ -319,13 +346,24 @@ if (urlParams.has('showSimbad')) {
     showSimbad = Boolean(parseFloat(urlParams.get('showSimbad')));
 }
 
+var showEBs = false;
+if (urlParams.has('showEBs')) {
+    showEBs = Boolean(parseFloat(urlParams.get('showEBs')));
+}
+
+var showVars = false;
+if (urlParams.has('showVars')) {
+    showVars = Boolean(parseFloat(urlParams.get('showVars')));
+}
+
 
 // Colors for different symbols:
 const colors = { simbad: "lightblue", 
-		 gaia: "green",
+		 gaiaEBs: "orange",
+		 gaiaVars: "orange",
 		 gaiaBlends: "green",
 		 gaiaAll: "#cc99ff",
-		 centralStar: '#3366FF',
+		 centralStar: "#3366FF",
 		 tic:  "#FBB917"};
 
 const gaia_options = {color: 'lightgreen', lineWidth: 1, 
@@ -333,6 +371,8 @@ const gaia_options = {color: 'lightgreen', lineWidth: 1,
 
 // Boolean to track if we've finished shifting sources in the TIC:
 var TIC_is_done = false;
+// Likewise for Gaia:
+var gaiaShiftDone = false;
 
 // Save hashes of deltaT and Tmag values for some sources, so 
 // we can also display them with Gaia sources.  These will be
@@ -402,6 +442,8 @@ async function setupAladin() {
     setupGaia();
     setupSimbad();
     setupFFI();
+    setupGaiaEBs();
+    setupGaiaVars();
     setAladinHeight();
 
     /* To work around an issue with popups sometimes
