@@ -461,10 +461,21 @@ function TICpopup(s) {
 */ 
 
 // EDR3 is: I/350/gaiaedr3  ; DR2 is: I/345/gaia2
-gaiaVizierCatalog = 'I/350/gaiaedr3';
+gaiaVizierCatalog = 'I/355/gaiadr3';
 gaiaEpoch = 2016.0;  // DR2 is 2015.5
 
 //  ---------- Gaia section: -------------
+
+/* Hash to hold all of the Gaia sources, keyed by source ID.  This
+ allows us to use the proper-motion-shifted coordinates created here
+ to update the positions of the variables and EBs as well. */ 
+
+var gaiaCrossRef = {};
+
+// Same for variable stars and EBs:
+var gaiaEBCrossRef = {};
+var gaiaVarCrossRef = {};
+
 function setupGaia() {
 
     let extra_options = "&-sort=_r&-out.all";
@@ -509,6 +520,178 @@ function setupGaia() {
 	var checkbox = document.getElementById('gaia');
 	checkbox.checked = showGaiaBlends;
 	toggleElements(checkbox);
+    }
+}
+
+async function setupGaiaEBs() {
+
+    // Query Vizier for Gaia sources that might be EBs - separate
+    // table in DR3
+
+    let extra_options = "&-sort=_r&-out.all";
+    let radius_deg = 5/60.;
+
+    // Since the TIC callback resets the field center, ideally we 
+    // want it to be done before starting here.  But don't keep
+    // waiting indefinitely - after 10 seconds give up and move on. 
+    var waited = 0;
+    while ((! TIC_is_done) && (waited < 10000)) {
+	await sleep(100);
+	waited += 100;  // milliseconds
+    }
+
+    gaiaEBs = A.catalogFromURL(vizierURL('I/358/veb', field_center, 
+					 radius_deg, extra_options), 
+			       {onClick: gaiaEBPopup,
+				name: 'Gaia EB candidates',
+				sourceSize: 14,
+				color: colors.gaiaEBs,
+				shape: 'triangle'},
+			       gaiaEBdone,
+			       false);
+
+    aladin.addCatalog(gaiaEBs);
+    gaiaEBs.isShowing = false;
+
+    // Overlaid layers are by default not shown initially, 
+    // unless the boolean is set in the URL params: 
+
+    let checkbox = document.getElementById('ebs');
+    checkbox.checked = showEBs;
+    toggleElements(checkbox);
+}
+
+async function setupGaiaVars() {
+
+    // Query Vizier for Gaia sources that are variable - separate
+    // table in DR3
+
+    let extra_options = "&-sort=_r&-out.all";
+    let radius_deg = 5/60.;
+
+    // Since the TIC callback resets the field center, ideally we 
+    // want it to be done before starting here.  But don't keep
+    // waiting indefinitely - after 10 seconds give up and move on. 
+    var waited = 0;
+    while ((! TIC_is_done) && (waited < 10000)) {
+	await sleep(100);
+	waited += 100;  // milliseconds
+    }
+
+    gaiaVars = A.catalogFromURL(vizierURL('I/358/vclassre', field_center, 
+					 radius_deg, extra_options), 
+			       {onClick: gaiaVarPopup,
+				name: 'Gaia variables',
+				sourceSize: 14,
+				color: colors.gaiaVars,
+				shape: 'rhomb'},
+			       gaiaVarsDone,
+			       false);
+
+    aladin.addCatalog(gaiaVars);
+    gaiaVars.isShowing = false;
+
+    // Defer code about toggling the checkbox and deciding whether to
+    // show catalog to the gaiaVarsDone callback so we can remove EBs
+    // (shown separately) first.
+
+}
+
+async function gaiaEBdone(sources) {
+    console.log("Loaded Gaia EBs: " + sources.length + " sources.")
+    // Update the label with number of sources: 
+    document.getElementById('gaia-ebs-N-sources').innerHTML = sources.length;
+
+    /* Wait for the shift of Gaia coordinates due to proper motion, then 
+       apply shifted coordinates to these sources as well: */
+    var waited = 0;
+    while ((! gaiaShiftDone) && (waited < 10000)) {
+	await sleep(100);
+	waited += 100;  // milliseconds
+    }
+    for (i=sources.length - 1; i >= 0; i--) {
+	s = sources[i];
+	d = s.data;
+	gaiaID = s.data.Source;
+	if (gaiaID in gaiaCrossRef) {
+	    // Copy the proper-motion-shifted coords: 
+	    s.ra = gaiaCrossRef[gaiaID].ra;
+	    s.dec = gaiaCrossRef[gaiaID].dec;
+	};
+	// Construct the info string used in pop-ups, so it can 
+	// also show when clicking on the regular Gaia symbols: 
+	period = 1/d.Freq;
+	title = '<br/>Gaia EB candidate,<br//>P = ' + period.toFixed(2) + ' days<br/>';
+	//title +=  'Solution percentile: ' + (d.Rank*100).toFixed(0) + '%<br/>';
+	title +=  'Model type: ' + d.ModelType;
+	// Save it in the hash:
+	gaiaEBCrossRef[gaiaID] = title;
+    };
+    gaiaEBs.reportChange();
+
+    // Check if the central star is an EB, and if so, change the popup: 
+    if (centralStar.gaia in gaiaEBCrossRef) {
+	centralStar.sources[0].popupDesc = gaiaEBCrossRef[centralStar.gaia] + 
+	    "<br/><br/>" + centralStar.sources[0].popupDesc;
+    }
+}
+
+
+async function gaiaVarsDone(sources) {
+    n_vars = sources.length; 
+    console.log("Loaded Gaia variables: " + n_vars + " sources.");
+    // Now remove the EBs from this catalog. Work in 
+    // reverse so that index numbers of sources yet
+    // to be processed don't change as we remove:
+    removed = 0;
+    for (i=gaiaVars.sources.length - 1; i >= 0; i--) {
+	source = gaiaVars.sources[i];
+	if (source.data.Class == 'ECL') {
+	    gaiaVars.remove(source);
+	    removed++;
+	}
+    }
+    console.log("Removed " + removed + " EB(s) from variable catalog.");
+
+    // Now that we've cleaned up EBs, which can show if specified. 
+    // Overlaid layers are by default not shown initially, 
+    // unless the boolean is set in the URL params: 
+    let checkbox = document.getElementById('vars');
+    checkbox.checked = showVars;
+    toggleElements(checkbox);
+
+    // Update the label with number of sources: 
+    document.getElementById('gaia-vars-N-sources').innerHTML = n_vars - removed;
+
+    /* Wait for the shift of Gaia coordinates due to proper motion, then 
+       apply shifted coordinates to these sources as well: */
+    var waited = 0;
+    while ((! gaiaShiftDone) && (waited < 10000)) {
+	await sleep(100);
+	waited += 100;  // milliseconds
+    }
+    for (i=gaiaVars.sources.length - 1; i >= 0; i--) {
+	s = gaiaVars.sources[i];
+	d = s.data;
+	gaiaID = s.data.Source;
+	if (gaiaID in gaiaCrossRef) {
+	    // Copy the proper-motion-shifted coords: 
+	    s.ra = gaiaCrossRef[gaiaID].ra;
+	    s.dec = gaiaCrossRef[gaiaID].dec;
+	}
+	// Construct the info string used in pop-ups, so it can 
+	// also show when clicking on the regular Gaia symbols: 
+	varType = gaiaVarTypes();
+	title = '<br/>Gaia variable<br/><i>' + varType[d.Class] + '<br/>';
+	title +=  '(Confidence: ' + (d.ClassSc*100).toFixed(0) + '%)</i>';
+	// Save it in the hash: 
+	gaiaVarCrossRef[gaiaID] = title;
+    }
+    gaiaVars.reportChange();
+    // Check if the central star is a var, and if so, change the popup: 
+    if (centralStar.gaia in gaiaVarCrossRef) {
+	centralStar.sources[0].popupDesc = gaiaVarCrossRef[centralStar.gaia] + 
+	     "<br/><br/>" + centralStar.sources[0].popupDesc;
     }
 }
 
@@ -637,7 +820,7 @@ async function shiftCatalogGaia(sources) {
 	    // If the Gaia ID matches that from the TIC, *and* the magnitudes
 	    // are relatively close, assume that this is the central star. The 
 	    // latter condition is to double-check against a reassignment of the DR2 
-	    // Gaia ID (from the TIC) to a different star in eDR3.  This isn't
+	    // Gaia ID (from the TIC) to a different star in DR3.  This isn't
 	    // foolproof but should catch some cases (if they exist) of that ID
 	    // getting split off to a much fainter neighbor. 
 	    if ((sources[i].data.Source == centralStar.gaia) && 
@@ -673,6 +856,8 @@ async function shiftCatalogGaia(sources) {
 		neighbors[centralStarIndex].isCentralStar = true;
 	    }
 	} 
+	// Add this source to the overall hash, indexed by source name: 
+	gaiaCrossRef[sources[i].data.Source] = sources[i];
     }
 
     if (!centralStarData) {
@@ -693,7 +878,7 @@ async function shiftCatalogGaia(sources) {
 		centralStarIndex = i;
 		// Save the Gaia ID so we can ID this star later; note that 
 		// this might override the DR2 Gaia ID saved from the TIC with 
-		// an eDR3 ID, but that allows us to match it unambiguously later
+		// an DR3 ID, but that allows us to match it unambiguously later
 		// if we are recalculating the neighbor list. 
 		centralStar.gaia = sources[i].data.Source;
 		break;
@@ -727,6 +912,8 @@ async function shiftCatalogGaia(sources) {
     }
     // Also update the AIJ apertures list
     updateAIJApertures(neighbors);
+    // Mark as done so other functions know: 
+    gaiaShiftDone = true;
 }
 
 function updateAIJApertures(neighbors) {
@@ -821,7 +1008,7 @@ function createAIJApertures(sources) {
 	var target;
 	// Is this the target star?  Check the Gaia ID, but also 
 	// double-check the magnitude in case the Gaia DR2 ID from
-	// the TIC has been re-assigned in eDR3 to a different star: 
+	// the TIC has been re-assigned in DR3 to a different star: 
 	if (s.isCentralStar) {
 	    target = 1;
 	    foundCentralStar = true;
@@ -855,14 +1042,21 @@ function gaiaPopup(s) {
     g = d.Source; // Gaia ID, used to index some hashes
     Tmag = Tmag_vals[g];
     deltaTmag = deltaT_vals[g];
+    // See if it's an EB or variable, possibly add text:
+    extraVarText = '';
+    if (g in gaiaVarCrossRef) {
+	extraVarText += gaiaVarCrossRef[g];
+    } else if (g in gaiaEBCrossRef) {
+	extraVarText += gaiaEBCrossRef[g];
+    }
     extraTicText = '';
     if (!Tmag) { // No match on Gaia ID, estimate T:
 	TGaia = TfromGaia(s)
 	Tmag = TGaia.toFixed(3);
 	deltaTmag = (TGaia - centralStar.Tmag).toFixed(3);
-	extraTicText += ' (new in eDR3 or Gaia ID changed)';
+	extraTicText += ' (new in DR3 or Gaia ID changed)';
     }
-    view.popup.setTitle('<b>TIC ' + TIC_vals[g] + extraTicText + '</b><br/><br/>');
+    view.popup.setTitle('<b>TIC ' + TIC_vals[g] + extraVarText + extraTicText + '</b><br/><br/>');
     var m = '<div class="equation">';
     // m += '<div><span>T</span> = <span>' + Tmag_vals[g] + '</span></div>';
     // m += '<div><span>&Delta;T</span> = <span>' + deltaT_vals[g] + '</span></div>';
@@ -870,6 +1064,60 @@ function gaiaPopup(s) {
     m += '<div>T = ' + Tmag + '</div>';
     m += '<div>&Delta;T = ' + deltaTmag + '</div>';
     m += '<div>r = ' + d._r + '</div>';
+    m += '</div>'
+    m += '<br/><div class="aladin-marker-measurement">';
+    m += '<table>';
+    for (var key in s.data) {
+	m += '<tr><td>' + key + '</td><td>' + s.data[key] + '</td></tr>';
+    }
+    m += '</table>';
+    m += '</div>';
+    view.popup.setText(m);
+    view.popup.setSource(s);
+    view.popup.show();
+}
+
+function gaiaEBPopup(s) {
+    // Call the variable-star popup, flagging as an EB
+    gaiaVarPopup(s, true);
+}
+
+function gaiaVarPopup(s, isEB=false) {
+    /* Function for showing a customized popup for Gaia sources; much
+       is copied out of the Aladin code for showPopup, but this allows
+       us to construct our own content for the popup.
+       We use the same function for EBs and other variables, but
+       just change a few things. 
+    */
+
+    var view = s.catalog.view;
+    var d = s.data;
+    // Convert degrees to arcsec: 
+    dist = (d._r * 3600).toPrecision(3) + '"';
+    g = d.Source; // Gaia ID, used to index some hashes
+    Tmag = Tmag_vals[g];
+    deltaTmag = deltaT_vals[g];
+    if (!Tmag) { // No match on Gaia ID, estimate T:
+	TGaia = TfromGaia(s)
+	Tmag = TGaia.toFixed(3);
+	deltaTmag = (TGaia - centralStar.Tmag).toFixed(3);
+    }
+    title = '<b>TIC ' + TIC_vals[g] + '</b><br/>';
+    if (isEB) {
+	period = 1/d.Freq;
+	title += 'Gaia EB candidate,<br//>P = ' + period.toFixed(2) + ' days<br/>';
+	title +=  'Solution percentile: ' + (d.Rank*100).toFixed(0) + '%<br/>';
+	title +=  'Model type: ' + d.ModelType + '<br/><br/>';
+    } else {
+	varType = gaiaVarTypes();
+	title += 'Gaia variable<br/><i>' + varType[d.Class] + '<br/>';
+	title +=  '(Confidence: ' + (d.ClassSc*100).toFixed(0) + '%)</i><br/><br/>';
+    }
+    view.popup.setTitle(title);
+    var m = '<div class="equation">';
+    m += '<div>T = ' + Tmag + '</div>';
+    m += '<div>&Delta;T = ' + deltaTmag + '</div>';
+    m += '<div>r = ' + dist + '</div>';
     m += '</div>'
     m += '<br/><div class="aladin-marker-measurement">';
     m += '<table>';
@@ -895,7 +1143,7 @@ function toggleElements(box) {
     if (box.id === 'gaia') {
 	item = gaiaBlends;
 	overlay = Gaia_boundary;
-	color = colors.gaia;
+	color = colors.gaiaBlends;
 	// Apertures link is toggled along with blends symbol: 
 	link = document.getElementById('aij-link-span');
     } else if (box.id == 'simbad') {
@@ -910,6 +1158,14 @@ function toggleElements(box) {
 	item = TIC;
 	overlay = '';
 	color = colors.tic;
+    } else if (box.id == 'ebs') {
+	item = gaiaEBs;
+	overlay = '';
+	color = colors.gaiaEBs;
+    } else if (box.id == 'vars') {
+	item = gaiaVars;
+	overlay = '';
+	color = colors.gaiaVars;
     } else {
 	console.log('Got unknown id in toggleElements: ' + box.id);
 	console.log(box);
@@ -1062,4 +1318,45 @@ function sexagesimalToDecimal(c) {
 	sign = -1;
     }
     return sign*(d + m/60 + s/3600);
+}
+
+function gaiaVarTypes() {
+
+    /* Define and return a dictionary with the 
+       types of variability defined in Gaia DR3.
+       Descriptions are shortened somewhat from
+       those given in the Gaia table.
+    */
+    const varDesc = {
+	"AGN": "AGN/Quasar",
+	"DSCT|GDOR|SXPHE": "&delta; Scuti, &gamma; Dor, or SX Phe type",
+	"WD": "White Dwarf variable",
+	"LPV": "Long-period variable", 
+	"ACV": "&alpha;<sup>2</sup> CVn type",
+	"CP": "Chemical Peculiar",
+	"MCP": "Magnetic Chemical Peculiar",
+	"ROAM": "Rapidly Oscillating Am star",
+	"ROAp": "Rapidly Oscillating Ap star",
+	"SXARI": "SX Ari variable",
+	"S": "Short-timescale var",
+	"MICROLENSING": "Microlensing event",
+	"CEP": "Cepheid",
+	"YSO": "Young Stellar Object",
+	"RS": "RS Can Ven type",
+	"ACYG": "&alpha; Cyg type",
+	"BCEP": "&beta; Cep type",
+	"BE|GCAS|SDOR|WR": "Eruptive var (Be, &gamma; Cas, S Dor, WR)",
+	"SN": "Supernova",
+	"SPB": "Slowly Pulsating B-star",
+	"ECL": "Eclipsing Binary",
+	"ELL": "Ellipsoidal variable",
+	"SYST": "Symbiotic variable",
+	"SOLAR_LIKE": "Solar-like var (flares, spots, rotation)",
+	"CV": "Cataclysmic variable",
+	"SDB": "Sub-dwarf B star (V1093 Her and V361 Hya)",
+	"RR": "RR Lyrae",
+	"EP": "Exoplanet transit",
+	"RCB": "R Cor Bor type variable" 
+    };
+    return varDesc;
 }
