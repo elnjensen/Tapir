@@ -67,6 +67,7 @@ use HTML::Entities;
 use Switch;
 use List::Util qw (min max); 
 use Text::CSV qw( csv );
+use Parallel::ForkManager;
 
 # We should be getting UTF-8 data from our target list, so make sure
 # we output in the same format. It's not clear whether this makes a
@@ -614,7 +615,7 @@ if ($start_date_string =~ /^\s*today\s*$/i) {
 	# DD-MM-YYYY format:
 	my $hint = '';
 	if ($month > 12) {
-	    $hint = "Maybe you listed days before months?. ";
+	    $hint = "Maybe you listed days before months?";
 	} 
 	die "Could not parse date [$start_date_string]; " 
 	    . "must be 'today' or in MM-DD-YYYY format. $hint";
@@ -873,8 +874,6 @@ my @error_names_list = ();
 # Flag to indicate whether we exit the loop after hitting a limit on
 # how many events to print: 
 my $reached_max_eclipses = 0;
-# Eclipses found so far: 
-my $n_eclipses = 0;
 
 # Now, loop over the lines of the input, assuming one target per
 # line.  Lines read from CSV are hash references, with each hash keyed
@@ -899,6 +898,12 @@ my $n_eclipses = 0;
 
 # If different field names are used in the input file, name
 # reassignments can be given below (as with RA and Dec here).
+
+# Our list of references to targets we want to search, i.e. those
+# that survive any cuts on target name, magnitude, etc., 
+#  and have sufficient data: 
+
+my @targets_to_search = ();
 
 TARGET_LOOP:
 foreach my $target_ref (@lines) {
@@ -1033,20 +1038,7 @@ foreach my $target_ref (@lines) {
 	  next TARGET_LOOP;
       }
 
-      my ($eclipse_time_ref,$eclipse_info_ref) = get_eclipses(\%target_info);
-
-      # Take the references to the returned lists of eclipse strings and
-      # times, and add those arrays to our growing lists:
-      push @eclipse_times, @$eclipse_time_ref;
-      push @eclipse_info, @$eclipse_info_ref;
-
-      # Check to see if we have reached the limit of how many events
-      # to find; if so set a flag and stop searching: 
-      $n_eclipses = scalar @eclipse_times;
-      if ($n_eclipses > $max_eclipses_to_print) {
-	  $reached_max_eclipses = 1;
-	  last TARGET_LOOP;
-      }
+      push @targets_to_search, \%target_info;
   }
 
   # Now we also need to check for observability for "any time"
@@ -1064,6 +1056,122 @@ foreach my $target_ref (@lines) {
     
 }  # end of TARGET_LOOP loop over input file
 
+# Print a message showing how many targets we are searching; if 
+# none at all, just bail out now: 
+if ($print_html == 1) {
+    my $n_targets = scalar @targets_to_search;
+    my $constraint_msg = "(on name, V mag, depth, etc.).  ";
+    if ($n_targets == 0) {
+	print "<h2>No targets match your constraints $constraint_msg";
+	print "Check your inputs.\n</h2>";
+	print $q->end_html;
+	exit;
+    } else {
+	if ($n_targets == 1) {
+	    print "<p>Only 1 target matches your constraints $constraint_msg";
+	} else {
+	    print "<p>$n_targets targets match your constraints $constraint_msg";
+	}
+	print "Searching for observable transits...</p>\n";
+    }
+}
+
+# For parallelizing, we split the input target list into roughly 
+# equal-sized chunks and parse out *lists* of targets in parallel.
+# This reduces overhead from the inter-process communication for 
+# spawning a process for a small number of targets. 
+
+# Number of forks we'll use; we have 8 cores, so leave one free: 
+my $forks = 7;
+# Divide the target array into chunks; make sure we don't
+# have more chunks than subprocesses, but also that we don't
+# end up with zero chunk size if target list is small:
+my $chunk_size = max(5, int(scalar @targets_to_search / ($forks - 1)));
+my $pm = Parallel::ForkManager->new($forks);
+# Hash that will hold the results: 
+my %results;
+
+# Anonymous subroutine that will run at the end of each fork, 
+# to return the results from that process in a hash:
+$pm->run_on_finish( sub {
+    my ($pid, $exit_code, $ident, $exit_signal, 
+	$core_dump, $data_structure_reference) = @_;
+    my $key = $data_structure_reference->{key};
+    $results{$key} = $data_structure_reference->{result};
+});
+
+# Assemble our set of chunks of the input target array: 
+my @chunk_list = ();
+# Make a copy so we preserve the original target list, since
+# 'splice' is destructive: 
+my @target_list_copy = @targets_to_search;
+while (@target_list_copy) {
+    my @target_list = splice @target_list_copy, 0, $chunk_size;
+    # We add a *reference* to this list of a subset of targets: 
+    push @chunk_list, \@target_list;
+}
+
+# Variable to serve as a key for hash returning from 
+# different forks:
+my $i = 0;
+# Now loop over the sub-lists, spinning off separate processes: 
+foreach my $chunk_ref (@chunk_list) {
+    $i++;
+    my $pid = $pm->start;
+    # Now we have forked, and have two processes entering at this 
+    # part of the code (if the fork was successful).
+    # Parent process has PID > 0, and falls through to next part of loop; 
+    # child process has PID == 0, so continues to do this chunk.
+    # If the fork failed, PID is undefined. 
+    if ((defined $pid) and ($pid == 0)) {
+	# Lists to save results from this set of targets: 
+	my @eclipse_times_partial = ();
+	my @eclipse_info_partial = ();
+	# Process a chunk of the target list: 
+	foreach my $target_ref ( @{$chunk_ref} ) {
+	    my ($eclipse_times_ref, $eclipse_info_ref) = get_eclipses($target_ref);
+	    push @eclipse_times_partial, @{$eclipse_times_ref};
+	    push @eclipse_info_partial, @{$eclipse_info_ref};
+	}
+	# Put references to these lists into an array: 
+	my @return_vals = (\@eclipse_times_partial, \@eclipse_info_partial);
+	# And return a reference to that array, keyed by our integer i:
+	$pm->finish(0, { result => \@return_vals, key => $i });
+    }
+}
+$pm->wait_all_children;
+ 
+# Now that all processes are done, we unpack the results hash
+# and put all of returned events into lists: 
+foreach my $key (keys %results) {
+   my ($eclipse_time_ref, $eclipse_info_ref) = @{ $results{$key} };
+   push @eclipse_times, @{ $eclipse_time_ref };
+   push @eclipse_info, @{ $eclipse_info_ref };
+}
+
+# Total number of events found: 
+my $n_eclipses = scalar @eclipse_times;
+
+# For now, save the non-parallel code in case we want to go back to
+# it, or do an if-then to run it in some cases. 
+# SEARCH_LOOP:
+# # Now actually do the searching:
+# foreach my $target_info_ref (@targets_to_search) {
+#     my ($eclipse_time_ref,$eclipse_info_ref) = get_eclipses($target_info_ref);
+
+#     # Take the references to the returned lists of eclipse strings and
+#     # times, and add those arrays to our growing lists:
+#     push @eclipse_times, @$eclipse_time_ref;
+#     push @eclipse_info, @$eclipse_info_ref;
+
+#     # Check to see if we have reached the limit of how many events
+#     # to find; if so set a flag and stop searching: 
+#     $n_eclipses = scalar @eclipse_times;
+#     if ($n_eclipses > $max_eclipses_to_print) {
+# 	$reached_max_eclipses = 1;
+# 	last SEARCH_LOOP;
+#     }
+# }
 
 # All done - sort, then print the output!
 
@@ -2241,12 +2349,17 @@ sub get_eclipses {
         $eclipse{obs_start_utc} = sprintf("%s %s",
 				       $obs_start_time->ymd, 
 				       $obs_start_time->hm);
+        $eclipse{obs_start_jd} = sprintf("%0.4f", 
+             DateTime::Format::Epoch::JD->format_datetime($obs_start_time) - 2450000);
 
 
         $obs_end_time->set_time_zone('UTC');
         $eclipse{obs_end_utc} = sprintf("%s %s",
 				       $obs_end_time->ymd, 
 				       $obs_end_time->hm);
+        $eclipse{obs_end_jd} = sprintf("%0.4f", 
+             DateTime::Format::Epoch::JD->format_datetime($obs_end_time) - 2450000);
+
 
         $eclipse{single_object} = $single_object;
         $eclipse{tess} = $tess;
