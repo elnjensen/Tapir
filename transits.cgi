@@ -540,23 +540,17 @@ input[type=submit] {
 
 <span style="color:purple"> 
 <em> 
-Latest updates:<br> 
+Latest updates (<a href="updates.html">full update list</a>):<br> 
 <ul>
-<li> June 2022: You can now plan your night of observing by selecting
+<li> October 2022: Aladin finder charts now use Gaia DR3 data, and
+    show Gaia variable star and eclipsing binary candidates.
+</li>
+<li> October 2022: You can now plan your night of observing by selecting
     the transits you plan to observe, which will hide any events that
     overlap with the selected event(s) (taking into account the
 					out-of-transit baseline),
     leaving only those that don't overlap.  Use the checkboxes next to
 the object name.
-</li>
-<li> May 2022: The NASA Exoplanet Archive target list below is (finally)
-    again up-to-date with the latest planets released.
-</li>
-<li>
-March 2022: Targets for <a
-href="https://exoplanets.nasa.gov/exoplanet-watch/about-exoplanet-watch/overview/"
-target='_blank'>Exoplanet Watch</a> are now
-    included.  
 </li>
 </ul>
 </em>
