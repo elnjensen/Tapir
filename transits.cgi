@@ -325,6 +325,19 @@ my $q = CGI->new();
 print $q->header(-type => 'text/html',
 		 -charset => 'utf-8');
 
+
+# If referred from the Exoplanet Watch page, set a variable that
+# will result in that target option being checked; otherwise
+# the NASA Exoplanet Archive option is selected: 
+
+my $Archive_checked = "Checked";
+my $ExoWatch_checked = "";
+
+if ($ENV{'HTTP_REFERER'} =~ /exoplanets\.nasa\.gov\/exoplanet-watch/) {
+    $Archive_checked = "";
+    $ExoWatch_checked = "Checked";
+}
+
 # Add some Javascript functions to the header; these will let 
 # us show/hide some elements on the fly, as needed; and they also pull
 # in source code for the date-picker widget.
@@ -562,7 +575,7 @@ the object name.
 <div class="indent p-style">
 (All target lists are updated nightly.)<br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="0" onclick="show_hide(this.value,'1','ephem_block')"
-Checked
+$Archive_checked
 /> NASA Exoplanet Archive database ($n_planets planets; <a
 				    href="transit_targets.csv">CSV
 				    file</a>)  <br/>
@@ -601,7 +614,7 @@ Checked
 </div>
 <br/>
 <INPUT TYPE="radio" NAME="single_object" VALUE="3" onclick="show_hide(this.value,'1','ephem_block')"
-/> <a
+$ExoWatch_checked /> <a
 href="https://exoplanets.nasa.gov/exoplanet-watch/about-exoplanet-watch/overview/"
 target='_blank'>Exoplanet Watch</a> targets ($n_planets_exowatch planets; <a
 				    href="exoplanet_watch_targets.csv">CSV
