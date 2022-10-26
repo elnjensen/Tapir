@@ -1100,8 +1100,11 @@ NAME="max_airmass">">Airmass plot</a>
 
   /* Run this stuff at the very end to make sure the element has been created already */ 
 
-window.onload = function(){
+/* Add some logging to see relative timing of window.onload vs.
+   document.ready. */
 
+$(document).ready(function(){
+    console.log("Document ready.");
     var slider = document.getElementById("transitFracSlider");
     var output = document.getElementById("transitFrac");
 
@@ -1120,8 +1123,13 @@ window.onload = function(){
        tippy(overlapSpinner);
        overlapSpinner._tippy.setContent('Allowed overlap (minutes) for selected events to be considered observable.  Negative values indicate <em>extra</em> time required between selected observations.');
     }
+}
+);
 
+window.onload = function(){
+    console.log("Window loaded.");
 };
+
 
 </script>
 
