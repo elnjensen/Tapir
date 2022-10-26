@@ -333,7 +333,7 @@ print $q->header(-type => 'text/html',
 my $Archive_checked = "Checked";
 my $ExoWatch_checked = "";
 
-if ($ENV{'HTTP_REFERER'} =~ /exoplanets\.nasa\.gov\/exoplanet-watch/) {
+if ($ENV{'HTTP_REFERER'} =~ /exoplanet-watch/) {
     $Archive_checked = "";
     $ExoWatch_checked = "Checked";
 }
