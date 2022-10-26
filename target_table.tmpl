@@ -246,13 +246,36 @@ Extra stylesheet below modifies the default dataTables one in a few --
 	}
     });
 
+   $.fn.dataTable.ext.search.push(
+    function( settings, searchData, dataIndex ) {
+	/* Search function for minimum transit depth to show. */
+	var depth_min_string = document.getElementById("depth_min");
+	var depth_min = parseFloat(depth_min_string.value);
+
+	/* Get the index for *original* col even if reordered: */
+	var idx=table.colReorder.transpose( 12 );
+	var depth_obs = parseFloat(searchData[idx])
+
+	    if ( isNaN(depth_min) || isNaN(depth_obs) || depth_obs >= depth_min )
+        {
+            return true;
+        } else {
+	    return false;
+	}
+    });
+
      // -----  End of functions for searching/filtering the table . -------- //
 
 
      /* Insert code in custom search toolbar */ 
-     $("#toolbar").html('&nbsp; &nbsp;&nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; <span class="with_tooltip" title="" id="overlapSpinner">Overlap:&nbsp;<input type="number" step="1" value="0" style="width: 3.5em" id="overlapTol"> m.</span><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
+     $("#toolbar").html('&nbsp; &nbsp; &nbsp; Show if visible transit % + baseline % &gt; <span id="transitFrac" style="width:25px;max-width:25px;display:inline-block"></span> <input type="range" min="0" max="200" value="0" style="display:inline;vertical-align:middle;line-height:22px;" class="slider" id="transitFracSlider">&nbsp; &nbsp; V<sub>max</sub>:&nbsp;<input type="number" min="0" step="0.1" style="width: 3.5em" id="vmax"> &nbsp; &nbsp; Depth<sub>min</sub>:&nbsp;<input type="number" min="0" step="0.1" value="0" style="width: 3.5em" id="depth_min"> ppt &nbsp; &nbsp; <span class="with_tooltip" title="" id="overlapSpinner">Overlap:&nbsp;<input type="number" step="1" value="0" style="width: 3.5em" id="overlapTol"> m.</span><span id="obs-label" style="float:right;vertical-align:middle;line-height:22px;display:inline;"><TMPL_VAR NAME="observatory_name"></span>');
  
      $('#vmax').on("change keyup", function() {
+	     table.draw();
+	     deselectHiddenRows();
+    } );
+
+     $('#depth_min').on("change keyup", function() {
 	     table.draw();
 	     deselectHiddenRows();
     } );
@@ -777,7 +800,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
    <TMPL_IF EXPR="baseline_hrs > 0"> 
      <span style="opacity:0.5;display:block;margin-bottom:6px;
        <TMPL_IF EXPR="is_daytime_pre">color:MediumVioletRed</TMPL_IF>" >
-    <TMPL_IF NAME="use_utc">
+    <TMPL_IF EXPR="use_utc">
 	 <TMPL_VAR NAME="pre_time_UTC">
     <TMPL_ELSE>
 	 <TMPL_VAR NAME="pre_time">
@@ -792,7 +815,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
     </TMPL_IF> 
       >
 
-<TMPL_IF NAME="use_utc">
+<TMPL_IF EXPR="use_utc">
    <TMPL_VAR NAME="start_time_UTC"></span>&mdash;<br/>
 <TMPL_ELSE>
    <TMPL_VAR NAME="start_time"></span>&mdash;<br/>
@@ -803,7 +826,7 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
     </TMPL_IF> 
     >
 
-<TMPL_IF NAME="use_utc">
+<TMPL_IF EXPR="use_utc">
    <TMPL_VAR NAME="mid_time_UTC">
 <TMPL_ELSE>
    <TMPL_VAR NAME="mid_time">
@@ -814,14 +837,14 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
         <TMPL_IF EXPR="ends_after_sunrise"> 
            style="color:MediumVioletRed" 
         </TMPL_IF> 
-  ><TMPL_IF NAME="use_utc"><TMPL_VAR NAME="end_time_UTC"><TMPL_ELSE><TMPL_VAR NAME="end_time"></TMPL_IF>
+  ><TMPL_IF EXPR="use_utc"><TMPL_VAR NAME="end_time_UTC"><TMPL_ELSE><TMPL_VAR NAME="end_time"></TMPL_IF>
 </span></span>
 
    <TMPL_IF EXPR="baseline_hrs > 0"> 
      <span style="opacity:0.5;display:block;margin-top:6px;
        <TMPL_IF EXPR="is_daytime_post">color:MediumVioletRed</TMPL_IF>" >
       &nbsp;&nbsp;&nbsp;&nbsp;
-    <TMPL_IF NAME="use_utc">
+    <TMPL_IF EXPR="use_utc">
 	 <TMPL_VAR NAME="post_time_UTC">
     <TMPL_ELSE>
 	 <TMPL_VAR NAME="post_time">
@@ -1132,9 +1155,3 @@ window.onload = function(){
 
 
 </script>
-
-
-
-<p>&nbsp;</p>
-<p />
-

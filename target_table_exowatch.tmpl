@@ -1,17 +1,5 @@
-<!--  Load the Javascript libraries (JQuery and Datatables) we need --
-  --  for table interaction.  -->
-
-
 <!-- Library for better tooltips -->
 <script  type="text/javascript" src="https://unpkg.com/tippy.js@3/dist/tippy.all.min.js"></script>
-
-
-
-     <!--  Old versions, keep for now in case something breaks: -->
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.11.5/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fc-3.2.5/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.css"/>
- 
-<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.11.5/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fc-3.2.5/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.js"></script>
-
 
 <!-- Created from https://datatables.net/download/, with options:
 Datables
@@ -19,19 +7,25 @@ JQuery 3 + DataTables
 Buttons
 Column Visibility
 ColReorder
-FixedColumns
 FixedHeader
 Responsive
 RowGroup
 Select
 -->
 
+<!-- Latest versions as of 2022-07-27
+except: 
 
-<!-- New versions here, gave some errors with colreorder and select.
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.11.5/b-2.2.2/b-colvis-2.2.2/cr-1.5.5/fc-4.0.2/fh-3.2.2/r-2.2.9/rg-1.1.4/sl-1.3.4/datatables.min.css"/>
+use Select 1.3.4 rather than 1.4.0: error about undefined
+     object when reordering rows
+
+use RowGroup 1.1.4 
+ -->
+
+<!-- 09/03/2022 - revert to old versions for now -->
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.css"/>
  
-<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.6.0/dt-1.11.5/b-2.2.2/b-colvis-2.2.2/cr-1.5.5/fc-4.0.2/fh-3.2.2/r-2.2.9/rg-1.1.4/sl-1.3.4/datatables.min.js"></script>
--->
+<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.18/b-1.5.6/b-colvis-1.5.6/cr-1.5.0/fh-3.1.4/r-2.2.2/rg-1.1.4/sl-1.3.4/datatables.min.js"></script>
 
 <!--
 Extra stylesheet below modifies the default dataTables one in a few --
@@ -53,16 +47,19 @@ Extra stylesheet below modifies the default dataTables one in a few --
 
 <script type="text/javascript">
   $(document).ready( function () {
-     var table = $('#target_table').DataTable( {
+     table = $('#target_table').DataTable( {
           paging: false,
           fixedHeader: true,
-          responsive: true,
+	  /* Might be useful later if we tweak selection colors:
+            see https://datatables.net/forums/discussion/73032 
+	  orderClasses: false, */
 	  select: {
 	  	 style: 'multi',
-		 selector: 'input:checkbox',
+		 selector: 'input:checkbox.observation-select',
 	     },
+          responsive: true,
+	  colReorder: { realtime: false, fixedColumnsLeft: 2},
           /* Set the DOM with DIVs to help w/ alignment. */
-          /* dom: '<"low"<"sticky"<"clear"f><"right"B>>t>ip', */
           dom: '<"right"B><"sticky"<"clear"f><"#toolbar">>tip',
           buttons: [
                     {
@@ -134,7 +131,8 @@ Extra stylesheet below modifies the default dataTables one in a few --
                          { "orderable": false, 
                            "targets": [ 1 ] },
 			 /* These control the order in which columns get hidden */ 
-			 /* on narrower screens.  Lower priorities are hidden first. */ 
+			 /* on narrower screens.  Higher-numbered priorities */
+	                 /* are hidden first. */ 
 			 /* Date, Name, V, % obs */
      { responsivePriority: 1, targets: [0,1,2,7] },
 			 /* Start/end, Duration, BJD, Elev., Depth */
@@ -149,15 +147,11 @@ Extra stylesheet below modifies the default dataTables one in a few --
           order: [[ 5, "asc" ]],
 	  rowGroup: { dataSrc: '0.display',
 		      startRender: function ( rows, group ) {
-		                 // Get the index for *original* col 0 even if reordered:
-		                 let idx=rows.colReorder.transpose( 0 );
 				 let node = rows.nodes()[0];
-				 let daylabel= node.cells[idx].getAttribute('data-header-label');
+				 let daylabel= node.cells[0].getAttribute('data-header-label');
 				 return daylabel;
 		             }
 	     },
-          colReorder: true,
-	  colReorder: { realtime: false, fixedColumnsLeft: 2},
 	 } );
 
 
@@ -589,8 +583,7 @@ Extra stylesheet below modifies the default dataTables one in a few --
     .dataTables_filter input { width: 100px }
 
   /* Style for selected rows when other parameter changes have 
-      made the current selections overlap.
-  */
+      made the current selections overlap.  */
 
   tr.overlapping, table.dataTable.display tbody tr.overlapping > .sorting_1  {
     background-color: #FF8080 !important;
@@ -721,7 +714,7 @@ data-tippy-content="Text is highlighted if 2000/(Moon distance) + Moon illum pct
 	<tr>
 	  <th> Local evening date </th>
           <th> Name </th>
-	  <th> <TMPL_IF NAME="tess">TESS mag<TMPL_ELSE>V or Kepler mag</TMPL_IF></th>
+	  <th> <TMPL_IF NAME="tess">TESS mag<TMPL_ELSE>V or Gaia mag</TMPL_IF></th>
 	  <th style="white-space: nowrap"> Start&mdash;<br/>Mid<br/> &mdash;End </th>
 	  <th> Duration </th>
 	  <th> BJD<sub>TDB</sub> start-mid-end </th>
@@ -773,6 +766,7 @@ PC = Planet Candidate <br />
 > 
     <TMPL_VAR NAME="sunset_local_string">    
 	<TMPL_IF NAME="use_utc">(local date)</TMPL_IF>
+</p>
   <p> <TMPL_VAR NAME="twilight_label"><br/> 
 
 <TMPL_IF NAME="use_utc">
@@ -782,7 +776,6 @@ PC = Planet Candidate <br />
   <TMPL_VAR NAME="sunset_time_local"> &ndash; <TMPL_VAR NAME="sunrise_time_local">
   (<TMPL_VAR NAME="timezone">) 
 </TMPL_IF>
-
   </p>
  </td> 
 
@@ -821,7 +814,7 @@ NAME="name">&ra=<TMPL_VAR NAME="ra">&dec=<TMPL_VAR
 NAME="dec">&timezone=<TMPL_VAR NAME="timezone">&jd=<TMPL_VAR
 NAME="sunset_jd">&jd_start=<TMPL_VAR NAME="jd_start">&jd_end=<TMPL_VAR
 NAME="jd_end">&use_utc=<TMPL_VAR 
-NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">" target='_blank'>Airmass
+NAME="use_utc">&max_airmass=<TMPL_VAR NAME="max_airmass">" target="_blank">Airmass
   plot</a>,
  <a
 href="acp_plan.cgi?target=<TMPL_VAR
@@ -858,7 +851,6 @@ NAME="coords">%20r%3D150s%22%2C%22paramsService%22%3A%22Mast.Catalogs.Tic.Cone%2
 
 
 <td align="center" data-sort="<TMPL_VAR NAME="jd_start">" style="white-space: nowrap"
-  data-search="<TMPL_VAR NAME="is_observable_baseline">"
    class="with_tooltip" data-tippy-content="Transit UTC:<br/><TMPL_IF EXPR="baseline_hrs > 0"><span style='display:block;margin-bottom:5px;'><TMPL_VAR NAME="pre_date_UTC">&nbsp;<TMPL_VAR NAME="pre_time_UTC"></span></TMPL_IF><TMPL_VAR NAME="start_date_UTC">&nbsp;<TMPL_VAR NAME="start_time_UTC"><br/><TMPL_VAR NAME="mid_date_UTC">&nbsp;<TMPL_VAR NAME="mid_time_UTC"><br/><TMPL_VAR NAME="end_date_UTC">&nbsp;<TMPL_VAR NAME="end_time_UTC"><TMPL_IF EXPR="baseline_hrs > 0"><span style='display:block;margin-top:5px;'><TMPL_VAR NAME="post_date_UTC">&nbsp;<TMPL_VAR NAME="post_time_UTC"></span></TMPL_IF>">
 
 
@@ -1190,13 +1182,15 @@ NAME="max_airmass">">Airmass plot</a>
 
   /* Run this stuff at the very end to make sure the element has been created already */ 
 
-$(document).ready( function(){
+/* Add some logging to see relative timing of window.onload vs.
+   document.ready. */
 
+$(document).ready(function(){
+    console.log("Document ready.");
     var slider = document.getElementById("transitFracSlider");
     var output = document.getElementById("transitFrac");
 
     if (slider) {
-	console.log('Setting slider properties. in doc.ready.');
        slider.oninput = function() {
    	   output.innerHTML = this.value;
 	   $('#target_table').DataTable().draw();
@@ -1221,6 +1215,10 @@ $(document).ready( function(){
     $('#target_table').DataTable().draw();
 
 
-    });
+});
+
+window.onload = function(){
+    console.log("Window loaded.");
+};
 
 </script>
