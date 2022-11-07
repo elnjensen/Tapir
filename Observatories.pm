@@ -242,6 +242,12 @@ our %observatories_western_north_america = (
               longitude => -117.68194,
 	      timezone => 'America/Los_Angeles',
           },
+
+          "Sommers-Bausch Observatory, Univ. of Colorado" => {
+              latitude => 40.00371,
+              longitude => -105.2630,
+	      timezone => 'America/Denver',
+          },
 					   );
 
 
