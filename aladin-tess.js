@@ -410,7 +410,7 @@ function setupTIC() {
 			    color: colors.tic,
 			    shape: 'cross'},
 			   shiftCatalogTIC, 
-			   false);
+			   true);
     aladin.addCatalog(TIC);
     // Default to not showing initially, unless boolean passed as an argument: 
     TIC.isShowing = showTIC;
@@ -497,7 +497,7 @@ function setupGaia() {
 				color: colors.gaiaAll,
 				shape: 'circle'},
 			       shiftCatalogGaia,
-			       false);
+			       true);
 
     aladin.addCatalog(gaiaAll);
     gaiaAll.isShowing = false;
@@ -548,7 +548,7 @@ async function setupGaiaEBs() {
 				color: colors.gaiaEBs,
 				shape: 'triangle'},
 			       gaiaEBdone,
-			       false);
+			       true);
 
     aladin.addCatalog(gaiaEBs);
     gaiaEBs.isShowing = false;
@@ -586,7 +586,7 @@ async function setupGaiaVars() {
 				color: colors.gaiaVars,
 				shape: 'rhomb'},
 			       gaiaVarsDone,
-			       false);
+			       true);
 
     aladin.addCatalog(gaiaVars);
     gaiaVars.isShowing = false;
