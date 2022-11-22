@@ -340,7 +340,7 @@ if ($ENV{'HTTP_REFERER'} =~ /exoplanet-watch/) {
 
 # Add some Javascript functions to the header; these will let 
 # us show/hide some elements on the fly, as needed; and they also pull
-# in source code for the date-picker widget.
+# in source code for the datepicker widget.
 
 
 print << "END_1";
@@ -359,6 +359,11 @@ observability of the known transiting exoplanets or TESS Objects of Interest
  information about each object, including finding charts and airmass
  plots." />
 <meta property="og:image" content="https://astro.swarthmore.edu/transits/transit_finder_example_small.png" />
+
+<!-- JQuery UI Datepicker -->
+<link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
 
 <script type="text/javascript">
 
@@ -388,19 +393,23 @@ observability of the known transiting exoplanets or TESS Objects of Interest
        }
    }
 
+   // Initialize datepicker objects
+   \$( function() {
+      // Regular expression for mm-dd-yyyy or m-d-yyyy
+      const re =/\\d{1,2}-\\d{1,2}-\\d{4}/
+      \$( ".datepicker" ).datepicker({
+        dateFormat: "mm-dd-yy",
+        constrainInput: false
+      }).change(function() {
+        // When date is changed, check to see if not a valid date format or not "today" then invalidate entry
+        const dateInput = \$(this).val();
+        if (!re.test(dateInput) && dateInput.toLowerCase() != "today") {
+            \$(this).datepicker("setDate", "");
+        }
+      });
+   });
+
 </script>
-
-<script type="text/javascript" 
-    src="./src/date-picker-v5/js/lang/en.js">
-</script>
-
-<script type="text/javascript" 
-    src="./src/date-picker-v5/js/datepicker.packed.js">
-</script>
-
-<link href="./src/date-picker-v5/css/datepicker.css" 
-    rel="stylesheet" type="text/css" />
-
 
 <title>Transit Finder</title>
     
@@ -869,14 +878,8 @@ print << "END_3";
 date starts search at local noon at observatory on that date.">
 Base date for transit list (mm-dd-yyyy or <i>'today'</i>): 
 <input type="text" value="today" size="10"
-    id="start_date" name="start_date"  style="text-align:center" />
+    id="start_date" name="start_date"  class="datepicker" style="text-align:center" />
 </p>
-
-<script type="text/javascript">
-  datePickerController.createDatePicker(
-	     {formElements:{"start_date":"m-ds-d-ds-Y"}}
-					);
-</script>
 
 <p>
 From that date, show transits for the next 
