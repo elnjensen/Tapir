@@ -248,6 +248,13 @@ our %observatories_western_north_america = (
               longitude => -105.2630,
 	      timezone => 'America/Denver',
           },
+
+          "Maury Lewin Astronomical Observatory" => {
+	      latitude => 34.142075,
+	      longitude => -117.872065,
+	      timezone => 'America/Los_Angeles',
+          },
+
 					   );
 
 
