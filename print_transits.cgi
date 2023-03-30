@@ -1082,7 +1082,9 @@ if ($print_html == 1) {
 # spawning a process for a small number of targets. 
 
 # Number of forks we'll use; we have 8 cores, so leave one free: 
-my $forks = 7;
+# Edit 2023-03-30:  Some people are hammering the server with 
+# large searches, drop this down: 
+my $forks = 4;
 # Divide the target array into chunks; make sure we don't
 # have more chunks than subprocesses, but also that we don't
 # end up with zero chunk size if target list is small:
