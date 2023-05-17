@@ -7,7 +7,7 @@
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
 # information, see  the README.txt file or 
-# http://astro.swarthmore.edu/~jensen/tapir.html .
+# https://astro.swarthmore.edu/~jensen/tapir.html .
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program, in the file COPYING.txt.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 
 use CGI;
@@ -988,7 +988,7 @@ Output results as: <br />
 <INPUT TYPE="radio" NAME="print_html" VALUE="0"/> CSV file
 for calendar import. (Save resulting output to a text file,
 then import into your observing calendar, e.g., <a
-href="http://www.google.com/support/calendar/bin/answer.py?hl=en&answer=37118">
+href="https://www.google.com/support/calendar/bin/answer.py?hl=en&answer=37118">
 import into Google Calendar.)</a></p>
 
 <p>Day/night definition: start night at Sun altitude of &nbsp;
@@ -1055,14 +1055,14 @@ href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet
     href="https://exofop.ipac.caltech.edu/tess/">ExoFOP-TESS</a>. 
 The finding charts provided here make use of images from the Digitized Sky
 Survey, which are subject to <a
-href="http://archive.stsci.edu/dss/copyright.html">copyright</a>, and can be acknowledged <a
-href="http://archive.stsci.edu/dss/acknowledging.html">like this</a>. 
+href="https://archive.stsci.edu/dss/copyright.html">copyright</a>, and can be acknowledged <a
+href="https://archive.stsci.edu/dss/acknowledging.html">like this</a>. 
 </p>
 
 <p>
  This
 tool is part of <a
-href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+href="https://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
 package</a> for planning astronomical observations; the <a
 href="https://github.com/elnjensen/Tapir">source code</a> is
 freely available.  
@@ -1070,7 +1070,7 @@ freely available.
 
 <p>
 This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>. 
+href="https://astro.swarthmore.edu/~jensen/">Eric Jensen</a>. 
 Feedback welcome!  Send <a
 href="mailto:ejensen1\@swarthmore.edu?Subject=Feedback on transit form"
 >here</a>.

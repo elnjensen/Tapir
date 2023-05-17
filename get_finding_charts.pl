@@ -12,7 +12,7 @@
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
 # information, see  the README.txt file or 
-# http://astro.swarthmore.edu/~jensen/tapir.html .
+# https://astro.swarthmore.edu/~jensen/tapir.html .
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,13 +26,13 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program, in the file COPYING.txt.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # The finding charts provided here make use of images from the
 # Digitized Sky Survey, which are subject to the copyright summary at
-# http://archive.stsci.edu/dss/copyright.html.  Please consider
+# https://archive.stsci.edu/dss/copyright.html.  Please consider
 # acknowledging their use in your work, as described at
-# http://archive.stsci.edu/dss/acknowledging.html.
+# https://archive.stsci.edu/dss/acknowledging.html.
 
 
 # Requirements:
@@ -40,7 +40,7 @@
 #  perl, ImageMagick (for 'convert' and 'identify' commands).
 # If you need a version of ImageMagick for Mac OSX, you can get it
 # from the main ImageMagick site, or there is an easy-to-use installer
-# at http://cactuslab.com/imagemagick/.
+# at https://cactuslab.com/imagemagick/.
 #   
 # Also requires the Perl packages LWP::Simple and Getopt::Long, but I
 # believe that those are part of the standard distribution for most if
@@ -341,7 +341,7 @@ if ($new_suffix =~ /jpe?g/i) {
 # construct the URL to use in order to get the image, then annotate
 # the image as needed.  Here's an example URL, which works as of
 # 07-21-2009:
-# http://archive.stsci.edu/cgi-bin/dss_search?v=poss2ukstu_red&r=09+57+05.45&d=-70+35+02.8&e=J2000&h=10.0&w=10.0&f=gif&c=none&fov=NONE&v3=
+# https://archive.stsci.edu/cgi-bin/dss_search?v=poss2ukstu_red&r=09+57+05.45&d=-70+35+02.8&e=J2000&h=10.0&w=10.0&f=gif&c=none&fov=NONE&v3=
 
 # Skip input lines that are blank or commented out:
 next if ((/^\s*$/) or (/^\#/));
@@ -382,7 +382,7 @@ if (scalar(@fields) < 3) {
     # Now construct the URL, and fetch it.  The 'get' function
     # is part of the LWP::Simple library.
     my $simbad_url
-	    = "http://vizier.cfa.harvard.edu/viz-bin/nph-sesame/" 
+	    = "https://vizier.cfa.harvard.edu/viz-bin/nph-sesame/" 
 	    . "-oxp/SN?${object_name}";
     if ($verbose) {
 	print STDERR "Attempting to resolve name to coords via URL "
@@ -444,7 +444,7 @@ next if ($coords_only);
 
 # Construct the URL to fetch:
 my $url =
-    sprintf('http://archive.stsci.edu/cgi-bin/dss_search?v=' 
+    sprintf('https://archive.stsci.edu/cgi-bin/dss_search?v=' 
 	    . 'poss2ukstu_red&r=%02d+%02d+%05.2f&d=%3s+%02d+%04.1f&e='
 	    . 'J2000&h=%0.1f&w=%0.1f&f=gif&c=none&fov=NONE&v3=',
 	    $ra1, $ra2, $ra3, $dec1, $dec2, $dec3, $field_height, 
