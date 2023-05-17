@@ -9,7 +9,7 @@
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
 # information, see  the README.txt file or 
-# http://astro.swarthmore.edu/~jensen/tapir.html .
+# https://astro.swarthmore.edu/~jensen/tapir.html .
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program, in the file COPYING.txt.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 # Updated 2017-10-24: fix bug relating to small decimal values in RA
 # or Dec fields, which were being incorrectly interpreted as radians. 
@@ -196,7 +196,7 @@ my $target_input = encode_entities($q->param("target"));
 
 # Choose an alternate Vizier mirror if one isn't working:
 #my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
-my $vizier_mirror = "http://vizier.cfa.harvard.edu/cgi-bin/";
+my $vizier_mirror = "https://vizier.cfa.harvard.edu/cgi-bin/";
 
 if (($ra eq '') and ($target_input ne '')) {
     # No RA given, try to resolve name with Simbad:
@@ -403,7 +403,7 @@ if ($invert) {
 
 # Then use these values to set up a gradient background for the plot: 
 my $gradient_def = <<END_GRADIENT;
-<!-- Created with SVG-edit - http://svg-edit.googlecode.com/ -->
+<!-- Created with SVG-edit - https://github.com/SVG-Edit/svgedit -->
  <defs>
   <linearGradient gradientUnits="userSpaceOnUse" x1="0%" y1="0%" 
     x2="100%" y2="0%" id="blue_fade">

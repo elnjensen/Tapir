@@ -3,7 +3,7 @@
 A longer description, and links to examples of the code in use
 (including interfaces for plotting transit visibility, making airmass
 plots, and making finding charts) can be found at
-http://astro.swarthmore.edu/~jensen/tapir.html .
+https://astro.swarthmore.edu/~jensen/tapir.html .
 
 
 There are two main parts to the software: the form that accepts the
@@ -119,7 +119,7 @@ script.  One can access a target list that is stored in a Google Docs
 spreadsheet, using the column headings to identify the fields.  The
 second parses the CSV file supplied by exoplanets.org into this target
 format.  (To see an implementation of the script that uses the latter
-target list, go to http://astro.swarthmore.edu/transits.cgi .)  If you
+target list, go to https://astro.swarthmore.edu/transits.cgi .)  If you
 wanted to avoid storing a local target list altogether, and only use
 an on-line spreadsheet, it wouldn't be too hard to combine the code
 that fetches and parses the Google spreadsheet with the code in the
@@ -149,7 +149,7 @@ file that are executed at run time over all visible targets, i.e. the
 code in the template is for one given row, but it is repeated as many
 times as necessary, with the values filled in for a particular target.
 There is an `HTML::Template` tutorial at
-http://www.perlmonks.org/?node_id=65642 .
+https://www.perlmonks.org/?node_id=65642 .
 
 
 ## Utility scripts and files included:
@@ -168,7 +168,7 @@ switch to see the usage details and options.
 `finding_charts.cgi` and `create_finding_chart.cgi`: these provide a
 standalone web interface to the script mentioned in the previous
 entry, for creating finding charts.  See
-http://astro.swarthmore.edu/finding_charts.cgi for an example.  If you
+https://astro.swarthmore.edu/finding_charts.cgi for an example.  If you
 want to avoid generating and storing local copies of finding charts
 for your targets, you could replace the links in the default HTML
 template to links that call `create_finding_chart.cgi` with appropriate

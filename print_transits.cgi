@@ -12,7 +12,7 @@
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
 # information, see  the README.txt file or 
-# http://astro.swarthmore.edu/~jensen/tapir.html .
+# https://astro.swarthmore.edu/~jensen/tapir.html .
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program, in the file COPYING.txt.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 
 # These next settings are turned on to have the strictest possible
@@ -945,7 +945,7 @@ foreach my $target_ref (@lines) {
   # into an array.  However, this array-of-hashes format ends up
   # making it easier to loop over later in the HTML output template.
   # (See explanation and examples for HTML::Template at
-  # http://html-template.sourceforge.net/article.html )
+  # https://html-template.sourceforge.net/article.html )
 
   # Make our local hash:
   my %input_data;
@@ -2533,7 +2533,7 @@ sub eclipse_csv_entry {
     # comma-separated string that conforms to the specification for
     # import of a calendar event into Google Calendar, following the
     # format for Google cal CSV entries at
-    # http://www.google.com/support/calendar/bin/answer.py?answer=45656
+    # https://www.google.com/support/calendar/bin/answer.py?answer=45656
 
     # In addition to the start/end times and dates, we also construct
     # a string with elevation, magnitude, etc.  This string is used in
@@ -3194,7 +3194,7 @@ sub bjd2utcjd {
     #   al. 2010 PASP 122:935,
     #   https://ui.adsabs.harvard.edu/abs/2010PASP..122..935E
     # For testing and other code, see also
-    # http://astroutils.astronomy.ohio-state.edu/time/ 
+    # https://astroutils.astronomy.ohio-state.edu/time/ 
     #
     # Input RA and Dec are assumed to be in radians; returned value
     # is a JD value corresponding to Earth-observed UTC. 

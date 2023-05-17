@@ -99,7 +99,7 @@ This form allows you to make annotated finding charts for a given
 astronomical target, by specifying either the coordinates, or an
 object name to be resolved by Simbad or NED.  The finding charts use
 data from <a
-href="http://gsss.stsci.edu/SkySurveys/SkySurveys.htm">the Digitized
+href="https://gsss.stsci.edu/SkySurveys/SkySurveys.htm">the Digitized
 Sky Survey</a>, and they are annotated with the object coordinates, a
 1-arcminute circle in the center for scale, and the object name if
 provided, as in <a href="finding_charts/HD_209458_b.jpg">this
@@ -174,16 +174,16 @@ Detector height (arcmin): <INPUT TYPE="text" name="detector_height" size="2"
 
 <p> The finding charts provided here make use of images from the Digitized Sky
 Survey, which are subject to the copyright in <a
-href="http://archive.stsci.edu/dss/copyright.html">this copyright summary</a>.
+href="https://archive.stsci.edu/dss/copyright.html">this copyright summary</a>.
 Please consider <a
-href="http://archive.stsci.edu/dss/acknowledging.html">acknowledging</a> their
+href="https://archive.stsci.edu/dss/acknowledging.html">acknowledging</a> their
 use in your work.  </p>
 
 <p>
 This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+href="https://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
 tool is part of <a
-href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+href="https://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
 package</a> for planning astronomical observations; the <a
 href="https://github.com/elnjensen/Tapir">source code</a> is
 freely available.  

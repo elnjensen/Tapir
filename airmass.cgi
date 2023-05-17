@@ -7,7 +7,7 @@
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
 # information, see  the README.txt file or 
-# http://astro.swarthmore.edu/~jensen/tapir.html .
+# https://astro.swarthmore.edu/~jensen/tapir.html .
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program, in the file COPYING.txt.  If not, see
-# <http://www.gnu.org/licenses/>.
+# <https://www.gnu.org/licenses/>.
 
 
 use CGI;
@@ -551,9 +551,9 @@ Dec (J2000): <INPUT TYPE="text" name="dec"> (dd:mm:ss or decimal degrees)
 </FORM>
 
 <p> This page was created by <a
-href="http://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
+href="https://astro.swarthmore.edu/~jensen/">Eric Jensen</a>.  This
 tool is part of <a
-href="http://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
+href="https://astro.swarthmore.edu/~jensen/tapir.html">the Tapir
 package</a> for planning astronomical observations; the <a
 href="https://github.com/elnjensen/Tapir">source code</a> is
 freely available.  </p>
