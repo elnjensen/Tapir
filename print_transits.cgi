@@ -1055,8 +1055,8 @@ foreach my $target_ref (@lines) {
 
 # Print a message showing how many targets we are searching; if 
 # none at all, just bail out now: 
+my $n_targets = scalar @targets_to_search;
 if ($print_html == 1) {
-    my $n_targets = scalar @targets_to_search;
     my $constraint_msg = "(on name, V mag, depth, etc.).  ";
     if ($n_targets == 0) {
 	print "<h2>No targets match your constraints $constraint_msg";
@@ -1069,7 +1069,8 @@ if ($print_html == 1) {
 	} else {
 	    print "<p>$n_targets targets match your constraints $constraint_msg";
 	}
-	print "Searching for observable transits...</p>\n";
+	my $n_days = sprintf("%0.1f", $days_in_past + $days_to_print);
+	print "Searching for observable transits over $n_days days...</p>\n";
     }
 }
 
@@ -1110,6 +1111,9 @@ while (@target_list_copy) {
     push @chunk_list, \@target_list;
 }
 
+# Set a limit on total amount of output:
+my $max_eclipses_per_fork = int(2500 / (scalar @chunk_list));
+
 # Variable to serve as a key for hash returning from 
 # different forks:
 my $i = 0;
@@ -1126,14 +1130,22 @@ foreach my $chunk_ref (@chunk_list) {
 	# Lists to save results from this set of targets: 
 	my @eclipse_times_partial = ();
 	my @eclipse_info_partial = ();
+	my $fork_reached_max_eclipses = 0;
 	# Process a chunk of the target list: 
 	foreach my $target_ref ( @{$chunk_ref} ) {
 	    my ($eclipse_times_ref, $eclipse_info_ref) = get_eclipses($target_ref);
 	    push @eclipse_times_partial, @{$eclipse_times_ref};
 	    push @eclipse_info_partial, @{$eclipse_info_ref};
+	    if ((scalar @eclipse_times_partial) >
+		$max_eclipses_per_fork) {
+		$fork_reached_max_eclipses = 1;
+		last;
+	    }
 	}
 	# Put references to these lists into an array: 
-	my @return_vals = (\@eclipse_times_partial, \@eclipse_info_partial);
+	my @return_vals = (\@eclipse_times_partial, 
+			   \@eclipse_info_partial,
+			   $fork_reached_max_eclipses);
 	# And return a reference to that array, keyed by our integer i:
 	$pm->finish(0, { result => \@return_vals, key => $i });
     }
@@ -1143,34 +1155,21 @@ $pm->wait_all_children;
 # Now that all processes are done, we unpack the results hash
 # and put all of returned events into lists: 
 foreach my $key (keys %results) {
-   my ($eclipse_time_ref, $eclipse_info_ref) = @{ $results{$key} };
-   push @eclipse_times, @{ $eclipse_time_ref };
-   push @eclipse_info, @{ $eclipse_info_ref };
+   # Only act if there are actually results here: 
+   if (defined $results{$key}) {
+       my ($eclipse_time_ref, $eclipse_info_ref, 
+	   $reached_max) = @{ $results{$key} };
+       push @eclipse_times, @{ $eclipse_time_ref };
+       push @eclipse_info, @{ $eclipse_info_ref };
+       if ($reached_max) {
+	   # Set the global flag if any fork maxed out:
+	   $reached_max_eclipses = 1;
+       }
+   }
 }
 
 # Total number of events found: 
 my $n_eclipses = scalar @eclipse_times;
-
-# For now, save the non-parallel code in case we want to go back to
-# it, or do an if-then to run it in some cases. 
-# SEARCH_LOOP:
-# # Now actually do the searching:
-# foreach my $target_info_ref (@targets_to_search) {
-#     my ($eclipse_time_ref,$eclipse_info_ref) = get_eclipses($target_info_ref);
-
-#     # Take the references to the returned lists of eclipse strings and
-#     # times, and add those arrays to our growing lists:
-#     push @eclipse_times, @$eclipse_time_ref;
-#     push @eclipse_info, @$eclipse_info_ref;
-
-#     # Check to see if we have reached the limit of how many events
-#     # to find; if so set a flag and stop searching: 
-#     $n_eclipses = scalar @eclipse_times;
-#     if ($n_eclipses > $max_eclipses_to_print) {
-# 	$reached_max_eclipses = 1;
-# 	last SEARCH_LOOP;
-#     }
-# }
 
 # All done - sort, then print the output!
 
@@ -1231,12 +1230,12 @@ if ($print_html) {   # True for either 1 or 2
 
   if ($reached_max_eclipses) {
       my $max_message = "Not all potential targets were searched. "
-          . "Output truncated by exceeding cap of "
-	  . " $max_eclipses_to_print events. "
+          . "Output is truncated by exceeding cap of "
+	  . " number of events searchable within the server query limits. "
           . "To search all targets, set tighter constraints"
           .  " or use a shorter time window.";
       if ($print_html == 1) {
-	  print $q->h2($max_message);
+	  print "<h2 style='color:crimson'>$max_message</h2>";
       } else {
 	  print $max_message;
       }
