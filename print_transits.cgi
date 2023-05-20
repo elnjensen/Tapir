@@ -256,7 +256,7 @@ if ((not defined $show_unc)
 
 
 # Fall back on 'or' behavior if there is it isn't defined,
-# or if there is anything other that "and" or "or" in that flag: 
+# or if there is anything other than "and" or "or" in that flag: 
 my $and_vs_or = lc($q->param("and_vs_or"));
 if ((not defined $and_vs_or) 
     or ($and_vs_or eq "") or ($and_vs_or !~ /^(and|or)$/)) {
@@ -271,8 +271,6 @@ if ((not defined $observing_from_space)
     or ($observing_from_space eq "")) {
   $observing_from_space = 0;
 }
-
-
 
 # Minimum priority to show; default to zero:
 my $minimum_priority = num_only($q->param("minimum_priority"));
@@ -313,11 +311,10 @@ if (not defined $target_string) {
 # ephemeris entry.  If this is set to 1, it means that we 
 # will not read the target file, but will instead take the
 # entered ephemeris for a single object and just use that.
-my $single_object = $q->param("single_object");
+my $single_object = num_only($q->param("single_object"));
 if ((not defined $single_object) or ($single_object eq "")) {
     $single_object = 0;
 }
-
 
 # The 'single_object' flag is overloaded to possibly indicate
 # alternate target lists: 
@@ -336,17 +333,17 @@ if ($single_object == 2) {
 }
 
 # Whether to show the ephemeris data:
-my $show_ephemeris = $q->param("show_ephemeris");
+my $show_ephemeris = num_only($q->param("show_ephemeris"));
 
 # How to define twilight (given value is altitude of Sun at division
 # between day and night, e.g. -12 for nautical twilight).
-my $twilight = $q->param("twilight");
+my $twilight = num_only($q->param("twilight"));
 if ((not defined $twilight) or ($twilight =~ /^\s*$/)) {
   $twilight = -12;
 }
 
 # Desired orbital phase to calculate and plot.  Zero is transit. 
-my $phase = $q->param("phase");
+my $phase = num_only($q->param("phase"));
 if ((not defined $phase) or ($phase =~ /^\s*$/)) {
   $phase = 0;
 }
@@ -392,7 +389,7 @@ switch ($twilight) {
 # parameter is not set, then the output is printed in a
 # comma-delimited form suitable for import into a calendar program,
 # e.g. Google Calendar.
-my $print_html =  $q->param("print_html");
+my $print_html =  num_only($q->param("print_html"));
 # If they don't pass the parameter at all, print HTML rather than CSV:
 if (not defined $print_html) {
     $print_html = 1;
@@ -836,14 +833,14 @@ if ($sunrises->is_empty_set() and $sunsets->is_empty_set()) {
     # if we use a regular target file:
 
     my %t;
-    $t{'RA'} =  $q->param("ra");
-    $t{'Dec'} =  $q->param("dec");
+    $t{'RA'} =  num_only($q->param("ra"));
+    $t{'Dec'} =  num_only($q->param("dec"));
 
-    $t{'name'} =  $q->param("target");
-    $t{'period'} =  $q->param("period");
-    $t{'epoch'} =  $q->param("epoch");
-    $t{'duration'} =  $q->param("duration");
-    $t{'depth'} =  $q->param("depth");
+    $t{'name'} =  encode_entities($q->param("target"));
+    $t{'period'} =  num_only($q->param("period"));
+    $t{'epoch'} =  num_only($q->param("epoch"));
+    $t{'duration'} =  num_only($q->param("duration"));
+    $t{'depth'} =  num_only($q->param("depth"));
     $t{'comments'} =  "Manually-entered single object";
 
     push @lines, \%t;
@@ -3317,10 +3314,15 @@ sub num_only {
     # Whitespace is also allowed. 
 
     my $input = shift @_;
-    if (defined($input)) {
-	$input =~ s/[^\d+-.,:\s]//g;
-	return $input;
-    } else {
+    # Needs to have at least one digit to be a valid number: 
+    if ((not defined($input)) or ($input !~ /\d/)) {
 	return "";
+    } else {
+	# Keep only relevant symbols:
+	$input =~ s/[^\d+-.,:\s]//g;
+	# Replace inadvertent double-minus or plus with a single one: 
+	$input =~ s/-{2,}/-/g;
+	$input =~ s/\+{2,}/\+/g;
+	return $input;
     }
 }
