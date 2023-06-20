@@ -5,7 +5,7 @@
    that file.  Placing them in a separate file here allows browsers to
    cache this part of the code, reducing bandwidth needed.
 
-  Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+  Copyright 2012-2023 Eric Jensen, ejensen1@swarthmore.edu.
  
   This file is part of the Tapir package, a set of (primarily)
   web-based tools for planning astronomical observations.  For more
@@ -210,6 +210,13 @@ function currentEpoch() {
     return currentYear + (Date.now() - jan1)*ms2year;
 }
 
+/* Hash to hold all of the TIC sources, keyed by *Gaia* DR2 source
+   ID. This allows us to try to match the right Gaia DR3 source to its
+   TIC counterpart, using some of the fields in the TIC to do some
+   sanity checking. */ 
+
+var TICCrossRef = {};
+
 
 async function shiftCatalogTIC(sources) {
     /* Callback function to process the TIC catalog returned by a
@@ -350,8 +357,9 @@ async function shiftCatalogTIC(sources) {
 	    }
 	}
 	// Update the distance from the center, using new coordinates: 
-	dist = center_coo.distance(new Coo(sources[i].ra,
-					   sources[i].dec));
+	sources[i].data.coo = new Coo(sources[i].ra,
+				      sources[i].dec);
+	dist = center_coo.distance(sources[i].data.coo);
 	
 	// Convert distance from center to arcsec:
 	sources[i].data._r = (dist * 3600).toPrecision(3) + '"';
@@ -360,6 +368,7 @@ async function shiftCatalogTIC(sources) {
 	// IDs:
 	if (sources[i].data.GAIA != '') {
 	    const g = sources[i].data.GAIA;
+	    TICCrossRef[g] = sources[i].data;
 	    deltaT_vals[g] = sources[i].data.DeltaT;
 	    Tmag_vals[g] = sources[i].data.Tmag;
 	    TIC_vals[g] = sources[i].data.TIC;
@@ -774,9 +783,10 @@ async function shiftCatalogGaia(sources) {
 	    sources[i].data.DecNow = sources[i].dec;
 	    sources[i].data.decshift = (pmDE*span).toPrecision(3) + ' mas';
 	};
+	// Save a coordinate object for separation calcs:
+	sources[i].data.coo = new Coo(sources[i].ra, sources[i].dec)
 	// Update the distance from the center, using new coordinates: 
-	dist = center_coo.distance(new Coo(sources[i].ra,
-					   sources[i].dec));
+	dist = center_coo.distance(sources[i].data.coo);
 	
 	// Convert distance from center to arcsec:
 	sources[i].data._r = (dist * 3600).toPrecision(3) + '"';
@@ -914,6 +924,12 @@ async function shiftCatalogGaia(sources) {
     updateAIJApertures(neighbors);
     // Mark as done so other functions know: 
     gaiaShiftDone = true;
+
+    // Debugging function to see which stars don't match well in 
+    // DR2 vs. DR3:
+    if (showMismatches) {
+	showGaiaMismatches();
+    }
 }
 
 function updateAIJApertures(neighbors) {
@@ -1029,6 +1045,122 @@ function createAIJApertures(sources) {
 }
 
 
+function gaiaTicMatch(s) {
+    /* Given a Gaia DR3 source s as input, see if there is a source in
+       the TIC catalog with the same Gaia ID (but from DR2).  Returns
+       a boolean that indicates whether or not the two sources are a
+       lausible match based on magnitude (if available) and
+       PM-corrected positions.
+    */
+
+    // Whether to log mismatches to the console: 
+    var logMismatch = true; 
+
+    var d = s.data;
+    var g = d.Source; // Gaia ID, used to index some hashes
+    // Since our Gaia catalog is DR3 and the Gaia ID in the TIC is DR2, 
+    // do a little extra checking to make sure this is the right star: 
+    var ticMatch = false; // Haven't matched TIC yet
+    var distString = '';
+    var deltaMagString = '';
+    var gaiaMagString = '';
+    if (g in TICCrossRef) {
+	inTIC = true;
+	gaiaMag = parseFloat(d.Gmag);
+	if (isNaN(gaiaMag)) {
+	    gaiaMag = TfromGaia(s);
+	    delta_mag = TICCrossRef[g].Tmag - gaiaMag;
+	} else {
+	    delta_mag = TICCrossRef[g].Gmag - d.Gmag;
+	}
+	// Separation in arcsec:
+	dist = d.coo.distance(TICCrossRef[g].coo)*3600;
+	// Check the magnitude separately, since it might be
+	// undefined; note that an undefined magnitude goes through as
+	// a match, rather than assuming that it doesn't match:
+	magMatch = true;
+	if ((!isNaN(delta_mag)) && (Math.abs(delta_mag) > gaiaMagThresh)) {
+	    magMatch = false;
+	}
+	if ((dist < gaiaDistThresh) && (isNaN(delta_mag))) {
+	    if (logMismatch) {
+		console.log('No mag defined for Gaia ID ' + g);
+		console.log('  TIC ' + TICCrossRef[g].TIC);
+		console.log('  Distance (arcsec): ' + dist.toFixed(3));
+		console.log('  T mag: ' +  TICCrossRef[g].Tmag);
+	    }
+	}
+	if ((dist < gaiaDistThresh) && magMatch ) {
+	    // If it's close by and near in mag, probably the right star: 
+	    ticMatch = true;
+	} else {
+	    distString = dist.toFixed(3);
+	    deltaMagString = delta_mag.toFixed(3);
+	    gaiaMagString = gaiaMag.toFixed(3);
+	    if (logMismatch) {
+		console.log('Mismatch with DR2 for Gaia ID ' + g);
+		console.log('  Delta G mag: ' + deltaMagString);
+		console.log('  Distance (arcsec): ' + distString);
+		console.log('  G mag: ' + d.Gmag);
+	    }
+	}
+    } else {
+	inTIC = false;
+    }
+    // Return an object so we can access the key params if needed: 
+    return {match: ticMatch,
+	    inTIC: inTIC,
+	    deltaMag: deltaMagString,
+	    dist: distString,
+	    gaiaMag: gaiaMagString
+	    };
+}
+
+function showGaiaMismatches() {
+    /* Debugging function for cycling through a set of sources and
+       logging messages for those that don't neatly match between Gaia
+       DR2 (listed in the TIC) and DR3 (used for the background
+       catalogs).
+    */
+
+    gaiaChanges = A.catalog({name: 'Gaia changes', sourceSize: 20, 
+			     color: 'red', shape: 'square'});
+
+    let cat = gaiaAll.sources;
+    unmatched = 0;
+    for (i = 0; i < cat.length; i++) {
+	s = cat[i];
+	matchData = gaiaTicMatch(s);
+	if ((!matchData.match) && (matchData.inTIC)) {
+	    // Set the popup text with some useful information:
+	    /*
+	    if (matchData.gaiaMag=='') {
+		gaiaMagString = '';
+	    } else {
+		gaiaMagString = matchData.gaiaMag.toFixed(3);
+	    }
+	    if (matchData.deltaMag=='') {
+	        deltaMagString = '';
+	    } else {
+		deltaMagString = matchData.deltaMag.toFixed(3);
+	    }
+	    */
+	    var popupCode =  '<b>G:</b> ' + matchData.gaiaMag + 
+		'<br/><b>&Delta;G:</b> ' +  matchData.deltaMag + 
+		'<br/><b>Offset:</b> ' + 
+		matchData.dist + '\"<br/><br/>';
+	    gaiaChanges.addSources(A.marker(s.ra, s.dec,  
+					    {popupTitle: 'TIC ' + 
+						    TICCrossRef[s.data.Source].TIC, 
+						    popupDesc: popupCode,
+						    shape: "square",
+						    useMarkerDefaultIcon: false}));
+	}
+    }
+    aladin.addCatalog(gaiaChanges);
+    gaiaChanges.isShowing = true;
+}
+
 function gaiaPopup(s) {
     /* Function for showing a customized popup for Gaia sources; much
        is copied out of the Aladin code for showPopup, but this allows
@@ -1039,9 +1171,20 @@ function gaiaPopup(s) {
 
     var view = s.catalog.view;
     var d = s.data;
-    g = d.Source; // Gaia ID, used to index some hashes
-    Tmag = Tmag_vals[g];
-    deltaTmag = deltaT_vals[g];
+    var g = d.Source; // Gaia ID, used to index some hashes
+    // Since our Gaia catalog is DR3 and the Gaia ID in the TIC is DR2, 
+    // do a little extra checking to make sure this is the right star: 
+    var matchData = gaiaTicMatch(s);
+    if (matchData.match) {
+	Tmag = TICCrossRef[g].Tmag;
+	TIC_name = 'TIC ' + TICCrossRef[g].TIC;
+	deltaTmag = TICCrossRef[g].DeltaT;
+    } else { // No match on Gaia ID, estimate T:
+	TIC_name = 'No TIC match (new in DR3 or Gaia ID changed from DR2)';
+	TGaia = TfromGaia(s)
+	Tmag = TGaia.toFixed(3);
+	deltaTmag = (TGaia - centralStar.Tmag).toFixed(3);
+    }
     // See if it's an EB or variable, possibly add text:
     extraVarText = '';
     if (g in gaiaVarCrossRef) {
@@ -1049,18 +1192,8 @@ function gaiaPopup(s) {
     } else if (g in gaiaEBCrossRef) {
 	extraVarText += gaiaEBCrossRef[g];
     }
-    extraTicText = '';
-    if (!Tmag) { // No match on Gaia ID, estimate T:
-	TGaia = TfromGaia(s)
-	Tmag = TGaia.toFixed(3);
-	deltaTmag = (TGaia - centralStar.Tmag).toFixed(3);
-	extraTicText += ' (new in DR3 or Gaia ID changed)';
-    }
-    view.popup.setTitle('<b>TIC ' + TIC_vals[g] + extraVarText + extraTicText + '</b><br/><br/>');
+    view.popup.setTitle('<b>' + TIC_name + extraVarText + '</b><br/><br/>');
     var m = '<div class="equation">';
-    // m += '<div><span>T</span> = <span>' + Tmag_vals[g] + '</span></div>';
-    // m += '<div><span>&Delta;T</span> = <span>' + deltaT_vals[g] + '</span></div>';
-    // m += '<div><span>r</span> = <span>' + d._r + '</span></div>';
     m += '<div>T = ' + Tmag + '</div>';
     m += '<div>&Delta;T = ' + deltaTmag + '</div>';
     m += '<div>r = ' + d._r + '</div>';
@@ -1245,7 +1378,7 @@ function setupFFI() {
     var ffiAlpha = 0;
     var slider = document.getElementById('ffi_slider');
     slider.oninput = function() {
-	ffiAlpha = this.value;
+	ffiAlpha = parseFloat(this.value).toFixed(2);
 	$('#ffiAlpha').html(ffiAlpha);
 	aladin.getOverlayImageLayer().setAlpha(ffiAlpha);
     }
@@ -1359,4 +1492,112 @@ function gaiaVarTypes() {
 	"RCB": "R Cor Bor type variable" 
     };
     return varDesc;
+}
+
+function createFovCanvas() {
+    var canvas = document.createElement("canvas");
+    canvas.setAttribute("id", "aladin-fovCanvas");
+    // Setting it to the same class as the catalog puts it in front of the image layer, 
+    // but behind the reticle layer so drags on that layer still work. 
+    canvas.setAttribute("class", "aladin-catalogCanvas");
+    const reticleCanvas = document.getElementsByClassName('aladin-reticleCanvas')[0];
+    aladinDiv = document.getElementById('aladin-lite-div');
+    aladinDiv.insertBefore(canvas, reticleCanvas);
+
+    // Redraw when display is panned or zoomed: 
+    aladin.on('zoomChanged', redrawFov);
+    aladin.on('positionChanged', redrawFov);
+
+    // Toggle FOV with checkbox:
+    var fovToggle = document.getElementById('fov-toggle');
+    // Initialize checkbox status:
+    fovToggle.checked = fov.showing;
+    if (fov.showing) {
+	document.getElementById('fov-params').style.display = 'inline-block';
+    }
+    // and set up a listener:
+    fovToggle.addEventListener('change', (e) => {
+	    var fovPars = document.getElementById('fov-params');
+	    if (e.currentTarget.checked) {
+		fov.showing = true;
+		fovPars.style.display = 'inline-block';
+	    } else {
+		fov.showing = false;
+		fovPars.style.display = 'none';
+	    }
+	    redrawFov();
+	});
+    // Initialize the size input areas with their current values: 
+    for (const x of ['PA', 'width', 'height']) {
+	element = document.getElementById('fov-'+x);
+	element.value = fov[x];
+    }
+}
+
+function changeFovPars(value, type) {
+    /* Function to change various aspects of the FOV indicator and
+     * re-draw. "type" is one of "PA", "height", or "width".
+     */
+
+    if (['PA', 'width', 'height'].includes(type)) {
+	fov[type] = value;
+    } else {
+	// Unknown input, do nothing: 
+	return;
+    }
+    redrawFov();
+}
+
+function redrawFov() {
+
+    var canvas = document.getElementById('aladin-fovCanvas');
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (! fov.showing) {
+	return;
+    }
+    var reticleCanvas = document.getElementsByClassName('aladin-reticleCanvas')[0];
+    // Make sure this canvas is the same size as others:
+    canvas.width = reticleCanvas.width;
+    canvas.height = reticleCanvas.height;
+
+    view = aladin.view;
+    ctx.strokeStyle = colors.fov;
+    ctx.lineWidth = 2;
+    var center_x = view.width/2;
+    var center_y = view.height/2;
+    view_width_arcmin = computeFov(view)*60.; // Width in arcmin
+    view_height_arcmin = view_width_arcmin * (view.height/view.width);
+    pix_per_arcmin = view.width/view_width_arcmin;
+
+    // Desired height, width of FOV rectangle, in arcmin
+    rect_height_pix = fov.height*pix_per_arcmin;
+    rect_width_pix = fov.width*pix_per_arcmin;
+    center_x = view.width*0.5;
+    center_y = view.height*0.5;
+    rect_ul_x = center_x - (rect_width_pix*0.5);
+    rect_ul_y = center_y - (rect_height_pix*0.5);
+
+    // Apply rotation as needed.  Translate coord system to object center: 
+    ctx.translate(center_x, center_y);
+    // PA is east of north, which is counterclockwise; negate angle and rotate: 
+    ctx.rotate(-fov.PA * Math.PI / 180);
+    // Reset coordinate system zero point and draw on rotated canvas:
+    ctx.translate(-center_x, -center_y);
+    ctx.strokeRect(rect_ul_x, rect_ul_y, rect_width_pix, rect_height_pix);
+
+    // Set the font params for drawing text.
+    fontsize = 25;
+    min_fontsize = 13;
+    // Scale font down a bit if we zoom out: 
+    if (view_width_arcmin > 60) {
+	fontsize = Math.round(Math.max(min_fontsize, 
+				       1500/view_width_arcmin));
+    }
+    ctx.font = fontsize + 'px Arial';
+    ctx.textAlign = "center";
+    ctx.fillStyle = colors.fov;
+    fov.coord_string = toSexagesimal(view.viewCenter.lon/15, 1, false) +
+	" " + toSexagesimal(view.viewCenter.lat, 0, false);
+    ctx.fillText(fov.coord_string, center_x, rect_ul_y - 10);
 }
