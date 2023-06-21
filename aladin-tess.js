@@ -1399,6 +1399,9 @@ function setAladinHeight() {
     newHeight = Math.min(94, Math.pow(0.95, heightRatio - 1) * 100);
     aladinDiv.style.height = Number.parseFloat(newHeight).toPrecision(3) + "%";
     aladin.view.fixLayoutDimensions();
+    // Also need to redraw our FOV overlay since resizing recenters the field:
+    createFovCanvas();
+    redrawFov();
 }
 
 
