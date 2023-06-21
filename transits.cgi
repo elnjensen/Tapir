@@ -2,7 +2,7 @@
 
 # Web interface to provide a form for calculating transit visibility. 
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2023 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -79,6 +79,7 @@ my ($observatory_string, $observatory_latitude, $observatory_longitude,
     $minimum_ha, $maximum_ha, $baseline_hrs,
     $minimum_depth, $minimum_priority, $maximum_V_mag, $show_unc,
     $use_utc, $use_AND, $twilight, $max_airmass, $min_plot_el,
+    $fov_height, $fov_width, $fov_PA, $show_fov,
     );
 
 
@@ -214,7 +215,7 @@ if (defined $cookies{'maximum_V_mag'}) {
     $maximum_V_mag = $cookies{'maximum_V_mag'}->value;
 }
 if (not defined $maximum_V_mag) {
-    $maximum_V_mag = ''
+    $maximum_V_mag = '';
 }
 
 # Setting of Sun elevation that defines night:
@@ -233,6 +234,38 @@ if (defined $cookies{'max_airmass'}) {
 if ((not defined $max_airmass) or ($max_airmass < 1)) {
     $max_airmass = 2.4;
 }
+
+# Parameters for showing the detector FOV overlay in Aladin: 
+if (defined $cookies{'showFov'}) {
+    $show_fov = $cookies{'showFov'}->value;
+}
+if (not defined $show_fov) {
+    $show_fov = 0;
+}
+
+my $fov_checked = ($show_fov) ? "checked" : "";
+
+if (defined $cookies{'fovWidth'}) {
+    $fov_width = $cookies{'fovWidth'}->value;
+}
+if (not defined $fov_width) {
+    $fov_width = '';
+}
+
+if (defined $cookies{'fovHeight'}) {
+    $fov_height = $cookies{'fovHeight'}->value;
+}
+if (not defined $fov_height) {
+    $fov_height = '';
+}
+
+if (defined $cookies{'fovPA'}) {
+    $fov_PA = $cookies{'fovPA'}->value;
+}
+if (not defined $fov_PA) {
+    $fov_PA = '';
+}
+
 
 # Find elevation equivalent of the max airmass:
 $min_plot_el = sprintf("%0.1f", 90 - rad2deg(asec($max_airmass)));
@@ -440,6 +473,12 @@ label {
   width: 40px;
   text-align: right;
 }
+
+input.fov-box {
+     width: 2.5em;
+     height: 1.5em;
+     text-align: right;
+ }
 
 input[type=submit] {
   height:30px; 
@@ -1034,6 +1073,15 @@ part of the transit must be at night), and which parts of an event are
 
  <INPUT NAME="max_airmass" VALUE="$max_airmass" size="4" /> 
 <br /> (Current airmass value of $max_airmass is elevation of $min_plot_el degrees.)
+</p>
+
+<p>
+ <input type="checkbox" name="showFov" value=1 $fov_checked > 
+ &nbsp; Show detector outline by default on Aladin finding charts <br/>
+  Width: <INPUT NAME="fovWidth" VALUE="$fov_width" class="fov-box" /> ' &nbsp;
+  Height: <INPUT NAME="fovHeight" VALUE="$fov_height" class="fov-box"/> '  &nbsp; 
+  PA: <INPUT NAME="fovPA" VALUE="$fov_PA"  class="fov-box" /> &deg; 
+<br/> 
 </p>
 
 <p>
