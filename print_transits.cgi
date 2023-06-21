@@ -7,7 +7,7 @@
 # provided by transits.cgi, which calls this script. 
 
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2023 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -296,6 +296,25 @@ if ((not defined $max_airmass) or ($max_airmass =~ /^\s*$/)) {
   $max_airmass = 2.4;
 }
 
+# Whether to show detector outline:
+my $showFov = num_only($q->param("showFov"));
+if ((not defined $showFov) or ($showFov =~ /^\s*$/)) {
+  $showFov = 0;
+}
+# Size / orientation for outline: 
+my $fovWidth = num_only($q->param("fovWidth"));
+if ((not defined $fovWidth) or ($fovWidth =~ /^\s*$/)) {
+  $fovWidth = '';
+}
+my $fovHeight = num_only($q->param("fovHeight"));
+if ((not defined $fovHeight) or ($fovHeight =~ /^\s*$/)) {
+  $fovHeight = '';
+}
+my $fovPA = num_only($q->param("fovPA"));
+if ((not defined $fovPA) or ($fovPA =~ /^\s*$/)) {
+  $fovPA = '';
+}
+
 # Target name string to match (can be a regex):
 my $target_string = encode_entities($q->param("target_string"));
 if (not defined $target_string) {
@@ -552,6 +571,39 @@ my $max_airmass_cookie = CGI::Cookie->
       -path    =>  $cookie_path,
      );
 
+my $show_fov_cookie = CGI::Cookie->
+  new(-name    =>  'showFov',
+      -value   =>  "$showFov",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+my $fov_width_cookie = CGI::Cookie->
+  new(-name    =>  'fovWidth',
+      -value   =>  "$fovWidth",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+my $fov_height_cookie = CGI::Cookie->
+  new(-name    =>  'fovHeight',
+      -value   =>  "$fovHeight",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+my $fov_PA_cookie = CGI::Cookie->
+  new(-name    =>  'fovPA',
+      -value   =>  "$fovPA",
+      -expires =>  $cookie_expires,
+      -domain  =>  $cookie_domain,
+      -path    =>  $cookie_path,
+     );
+
+
 # Only store the V mag value if it's constraining, otherwise blank:
 my $maximum_Vmag_cookie = CGI::Cookie->
   new(-name    =>  'maximum_V_mag',
@@ -751,6 +803,10 @@ if ($print_html == 0) {
 				   $maximum_Vmag_cookie, 
 				   $minimum_depth_cookie,
 				   $max_airmass_cookie,
+				   $show_fov_cookie,
+				   $fov_width_cookie,
+				   $fov_height_cookie,
+				   $fov_PA_cookie,
 				   $twilight_cookie]
 		       );
       print $q->start_html( -title => "Upcoming transits",
@@ -1325,6 +1381,10 @@ if ($print_html) {   # True for either 1 or 2
 		     reached_max_eclipses => $reached_max_eclipses,
 		     tess => $tess,
 		     no_twilight => $no_twilight,
+		     showFov => $showFov, 
+		     fovWidth => $fovWidth, 
+		     fovHeight => $fovHeight, 
+		     fovPA => $fovPA, 
 		    );
   print $template->output();
 

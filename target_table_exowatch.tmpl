@@ -801,7 +801,7 @@ PC = Planet Candidate <br />
 <br/>Finding charts: 
   <TMPL_IF EXPR="finding_chart">
   <a href="<TMPL_VAR NAME="finding_chart">" target='_blank'>Annotated</a>,</TMPL_IF> 
-  <a href="aladin.html?name=<TMPL_VAR NAME="name">&ra=<TMPL_VAR NAME="ra_deg">&dec=<TMPL_VAR NAME="dec_deg">&mag=<TMPL_IF EXPR="tmag"><TMPL_VAR NAME="tmag"><TMPL_ELSE><TMPL_VAR EXPR="vmag"></TMPL_IF>&depth=<TMPL_VAR NAME="depth">"
+  <a href="aladin.html?name=<TMPL_VAR NAME="name">&ra=<TMPL_VAR NAME="ra_deg">&dec=<TMPL_VAR NAME="dec_deg">&mag=<TMPL_IF EXPR="tmag"><TMPL_VAR NAME="tmag"><TMPL_ELSE><TMPL_VAR EXPR="vmag"></TMPL_IF>&depth=<TMPL_VAR NAME="depth">&showFov=<TMPL_VAR NAME="showFov">&fovHeight=<TMPL_VAR NAME="fovHeight">&fovWidth=<TMPL_VAR NAME="fovWidth">&fovPA=<TMPL_VAR NAME="fovPA">"
   target="_blank">Aladin</a>, <a href="http://sky-map.org/?ra=<TMPL_VAR NAME="ra">&de=<TMPL_VAR NAME="dec">&zoom=8&show_box=1&show_grid=1&show_constellation_lines=1&show_constellation_boundaries=1&show_const_names=0&show_galaxies=1&img_source=DSS2" target='_blank'>
 SkyMap</a>;
 <br/>
