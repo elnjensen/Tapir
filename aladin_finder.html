@@ -111,6 +111,13 @@ $('document').ready(function() {
 </script>
 
 
+<style type="text/css">
+input.fov-box {
+     width: 2.5em;
+     height: 1.5em;
+     text-align: right;
+ }
+</style>
 
 
 <title>Aladin Finding Chart</title>
@@ -154,6 +161,18 @@ Dec (decimal degrees or dd:mm:ss, J2000): <INPUT TYPE="text" id="dec" name="dec"
 			<INPUT TYPE="text" id="mag" name="mag"> mag <br/> 
 									      If the target T magnitude is not provided it will be determined from the TIC if the input source has a TIC number, but the depth field is required for this (optional) feature to work. 
 </p>
+
+<p>
+ <input type="checkbox" name="showFov" value=1> 
+ &nbsp;Show detector outline on finding chart <br/>
+  Width: <INPUT NAME="fovWidth" class="fov-box" /> ' &nbsp;
+  Height: <INPUT NAME="fovHeight" class="fov-box"/> '  &nbsp; 
+  PA: <INPUT NAME="fovPA" class="fov-box" /> &deg; 
+<br/> 
+</p>
+
+
+
 <p>
 <INPUT TYPE="submit" VALUE="Submit">
 </p>

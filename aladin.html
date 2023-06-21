@@ -15,8 +15,10 @@
 <!-- Functions for Aladin Lite finder interface.  The version string here is
      present to force browsers to load the file if we make changes, and update
      the version string here.  It is not used in the script. -->
-<script type='text/javascript' src='aladin-tess.js?version=1.11' charset='utf-8'></script>
+     <script type='text/javascript' src='aladin-tess.js?version=1.12' charset='utf-8'></script>
 
+<!-- DOMPurify library for sanitizing URL params, https://github.com/cure53/DOMPurify -->
+<script type='text/javascript' src='src/purify.min.js'></script>
 
 <!-- Some styling for aligning equations at = sign, based on
 https://stackoverflow.com/questions/22763127/aligning-text-on-a-specific-character -->
@@ -42,13 +44,19 @@ https://stackoverflow.com/questions/22763127/aligning-text-on-a-specific-charact
 }
 
 <!-- Prevent browser from flagging initial field as invalid with red border-->
-input: {
+input {
     border:none;
     box-shadow:none;
 }
 input:invalid {
     box-shadow:none;
 }
+
+input.fov-box {
+     width: 2.5em;
+     height: 1.5em;
+     text-align: right;
+ }
 
 </style>
 
@@ -137,9 +145,9 @@ oninput="setTimeout(changeGaiaNeighbors(this.value),200)"> ppt
 
 <span style="white-space:nowrap;" id="tess-ffi-group">
 TESS FFI layer opacity:
-<input id='ffi_slider' style='vertical-align:middle;width:20vw;' step='0.01' 
-		min='0' max='1' type='range' value='0'>&nbsp;&nbsp;
-<span id='ffiAlpha'> 0 </span>
+<input id='ffi_slider' style='vertical-align:middle;width:10vw;' step='0.01' 
+		min='0' max='1' type='range' value='0.00'>&nbsp;&nbsp;
+<span id='ffiAlpha'>0.00</span>
 </span>
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -154,18 +162,37 @@ Images: &nbsp;
 &nbsp;&nbsp;
 <input type="radio" id="sdss-button" name="survey" value="P/SDSS9/color" 
    onclick="aladin.setImageSurvey(value)"><label for="sdss" id="sdss-label">SDSS</label>
-
 </span>
 
+<span style="white-space:nowrap;" id="fov-controls">
+ &nbsp;&nbsp;&nbsp;&nbsp;
+<span  class="with_tooltip" 
+data-tippy-content="Show outline of detector size">
+<input type="checkbox" id="fov-toggle">
+<label for="fov-toggle"> Detector outline
+</label></span>
+<span id="fov-params" style="display:none">:
+  <label for="fov-width">Width:</label> <input id="fov-width" class="fov-box" oninput="setTimeout(changeFovPars,300,this.value,'width')"> '&nbsp;&nbsp;
+<label for="fov-height">Height:</label> <input id="fov-height" class="fov-box" oninput="setTimeout(changeFovPars,300,this.value,'height')"> '&nbsp;&nbsp;
+   <label for="fov-PA">PA:</label> <input id="fov-PA" class="fov-box" 
+oninput="setTimeout(changeFovPars,300,this.value,'PA')"> &deg;
+&nbsp; <button onclick="copyCoords()" class="button_tooltip" 
+data-tippy-content="Copy coords to clipboard">&#x21D2;&#x1F4CB;<span class="confirmation" data-tippy-content="Coords copied!"></span></button>
+</span>
+</span>
 </div>
 
 <div id='aladin-lite-div' style='width: 100%; height: 95%' onclick='mouseToRaDec(event,true)'></div>
-
 
 <script type='text/javascript' charset='utf-8'>
 
 // Get params from URL
 const urlParams = new URLSearchParams(window.location.search);
+
+// Function to make sure params are clean: 
+function cleanUrlParam(p) {
+    return DOMPurify.sanitize(urlParams.get(p));
+}
 
 // Vizier mirrors are having issues; temporarily change
 // default to Strasbourg server, don't query mirrors or
@@ -199,7 +226,7 @@ var vizierServer = 'https://vizier.u-strasbg.fr/';
 
 // Override the saved value if needed for testing:
 if (urlParams.has('ip')) {
-    setVizier(urlParams.get('ip'));
+    setVizier(cleanUrlParam('ip'));
 }
 
 // A few numbers we will use: 
@@ -230,7 +257,7 @@ var tic_number_full; // Possibly includes trailing .01, etc.
 
 var Tmag = '';
 if (urlParams.has('mag')) {
-    Tmag = parseFloat(urlParams.get('mag'));
+    Tmag = parseFloat(cleanUrlParam('mag'));
     // The parameter could have been empty, so make sure we
     // actually got a number: 
     if (isNaN(Tmag)) {
@@ -242,7 +269,7 @@ if (urlParams.has('mag')) {
 // as a boolean later for whether to show that part of the interface. 
 var depth = null;
 if (urlParams.has('depth')) {
-    depth = parseFloat(urlParams.get('depth'));
+    depth = parseFloat(cleanUrlParam('depth'));
 } 
 
 /* Now get the delta mag we want, based on the depth of the transit.
@@ -252,7 +279,7 @@ if (urlParams.has('depth')) {
 var depthDeltaMag = -2.5*Math.log10((depth || 1E10)/1000.);
 
 if (urlParams.has('name')) {
-    starname = urlParams.get('name');
+    starname = cleanUrlParam('name');
     // Get just the number; first drop the leading 'TIC':
     if (starname.match(/TIC/)) {
 	tic_number_full = starname.replace(/^TIC */, '');
@@ -279,30 +306,30 @@ let coordRe = /\d+\s*?(:|\s)\s*?\d+\s*?\1\s*?\d+/;
 // match a case like ".345" with no digit before decimal place. 
 let numberRe = /^\s*[+-]?(\d+\.?\d*|\.\d+)\s*$/;
 
-if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) && 
-    urlParams.has('dec') && coordRe.test(urlParams.get('dec'))) {
+if (urlParams.has('ra') && coordRe.test(cleanUrlParam('ra')) && 
+    urlParams.has('dec') && coordRe.test(cleanUrlParam('dec'))) {
     // Convert RA from hours to degrees: 
-    ra_center = sexagesimalToDecimal(urlParams.get('ra').trim())*15;
+    ra_center = sexagesimalToDecimal(cleanUrlParam('ra').trim())*15;
     ra_string = '' + ra_center;
-    dec_center = sexagesimalToDecimal(urlParams.get('dec').trim());
+    dec_center = sexagesimalToDecimal(cleanUrlParam('dec').trim());
     if (ra_center && dec_center) {
 	have_center_coords = true; 
     } else {
-	alert("Could not parse entered coordinates: " + urlParams.get('ra') + 
-	      ' ' + urlParams.get('dec'));
+	alert("Could not parse entered coordinates: " + cleanUrlParam('ra') + 
+	      ' ' + cleanUrlParam('dec'));
     }
-} else if (urlParams.has('ra') && numberRe.test(urlParams.get('ra')) && 
-	   urlParams.has('dec') && numberRe.test(urlParams.get('dec'))) {
+} else if (urlParams.has('ra') && numberRe.test(cleanUrlParam('ra')) && 
+	   urlParams.has('dec') && numberRe.test(cleanUrlParam('dec'))) {
     // Use decimal coords from URL.  Work around a quirk of Vizier query - if
     // RA param is an integer, Vizier interprets it as hours, not
     // degrees. Add a decimal point in that case to get correct
     // interpretation.
-    ra_string = urlParams.get('ra');
+    ra_string = cleanUrlParam('ra');
     if (! ra_string.includes('.')) {
 	ra_string = ra_string + '.0';
     }
     ra_center = parseFloat(ra_string);
-    dec_center = parseFloat(urlParams.get('dec'));
+    dec_center = parseFloat(cleanUrlParam('dec'));
     have_center_coords = true; 
 } else if (urlParams.has('name') && (/\S+/.test(starname))) {
     /* Already got name from URL above;
@@ -328,34 +355,87 @@ if (urlParams.has('ra') && coordRe.test(urlParams.get('ra')) &&
 // Are the blending Gaia stars shown initially? 
 var showGaiaBlends = false;
 if (urlParams.has('showBlends')) {
-    showGaiaBlends = Boolean(parseFloat(urlParams.get('showBlends')));
+    showGaiaBlends = Boolean(parseFloat(cleanUrlParam('showBlends')));
 }
 
 //  Same idea for the other catalogs: 
 // Are they shown initially? 
 var showGaia = false;
 if (urlParams.has('showGaia')) {
-    showGaia = Boolean(parseFloat(urlParams.get('showGaia')));
+    showGaia = Boolean(parseFloat(cleanUrlParam('showGaia')));
 }
 var showTIC = false;
 if (urlParams.has('showTIC')) {
-    showTIC = Boolean(parseFloat(urlParams.get('showTIC')));
+    showTIC = Boolean(parseFloat(cleanUrlParam('showTIC')));
 }
 var showSimbad = false;
 if (urlParams.has('showSimbad')) {
-    showSimbad = Boolean(parseFloat(urlParams.get('showSimbad')));
+    showSimbad = Boolean(parseFloat(cleanUrlParam('showSimbad')));
 }
 
 var showEBs = false;
 if (urlParams.has('showEBs')) {
-    showEBs = Boolean(parseFloat(urlParams.get('showEBs')));
+    showEBs = Boolean(parseFloat(cleanUrlParam('showEBs')));
 }
 
 var showVars = false;
 if (urlParams.has('showVars')) {
-    showVars = Boolean(parseFloat(urlParams.get('showVars')));
+    showVars = Boolean(parseFloat(cleanUrlParam('showVars')));
 }
 
+// Whether to show Gaia sources that don't match TIC: 
+var showMismatches = false;
+if (urlParams.has('showMismatches')) {
+    showMismatches = Boolean(parseFloat(cleanUrlParam('showMismatches')));
+}
+
+// Thresholds for determining how much mismatch between DR2
+// (listed in TIC) and DR3 (used for Gaia catalog) we allow before
+// declaring a mismatch of Gaia source:
+var gaiaDistThresh = 0.5; // arcsec
+var gaiaMagThresh = 0.5;
+if (urlParams.has('gaiaDistThresh')) {
+    gaiaDistThresh = parseFloat(cleanUrlParam('gaiaDistThresh'));
+}
+if (urlParams.has('gaiaMagThresh')) {
+    gaiaMagThresh = parseFloat(cleanUrlParam('gaiaMagThresh'));
+}
+
+// Default settings for detector FOV outline; LCO 1m is 26' square.
+var fov = {
+    height: 26,
+    width: 26,
+    PA: 0,
+    showing: false,
+    coord_string: ''};
+
+if (urlParams.has('showFov')) {
+    fov.showing = Boolean(parseFloat(cleanUrlParam('showFov')));
+}
+
+if (urlParams.has('fovHeight')) {
+    const val = parseFloat(cleanUrlParam('fovHeight'));
+    // Only assign if a valid number:
+    if ((val) && (val > 0)) {
+	fov.height = val;
+    };
+}
+
+if (urlParams.has('fovWidth')) {
+    const val = parseFloat(cleanUrlParam('fovWidth'));
+    // Only assign if a valid number:
+    if ((val) && (val > 0)) {
+	fov.width = val;
+    };
+}
+
+if (urlParams.has('fovPA')) {
+    const val = parseFloat(cleanUrlParam('fovPA'));
+    // Only assign if a valid number; negative OK
+    if (val) {
+	fov.PA = val;
+    };
+};
 
 // Colors for different symbols:
 const colors = { simbad: "lightblue", 
@@ -364,6 +444,7 @@ const colors = { simbad: "lightblue",
 		 gaiaBlends: "green",
 		 gaiaAll: "#cc99ff",
 		 centralStar: "#3366FF",
+		 fov:  "#FFAAFF",
 		 tic:  "#FBB917"};
 
 const gaia_options = {color: 'lightgreen', lineWidth: 1, 
@@ -445,6 +526,8 @@ async function setupAladin() {
     setupGaiaEBs();
     setupGaiaVars();
     setAladinHeight();
+    createFovCanvas();
+    redrawFov();
 
     /* To work around an issue with popups sometimes
        not working, allow them also to triggered on
@@ -489,7 +572,6 @@ async function setupAladin() {
 	  }
        }
     });
-    
 }
 
 // Track whether or not the shift key is down: 
@@ -498,8 +580,62 @@ var shift_pressed = false;
 // Call the above master function that sets everything up: 
 setupAladin();
 
-
 $(window).resize(setAladinHeight);
+
+</script>
+
+<!-- Now that all content is loaded, invoke the script to 
+     recognize and style the tooltips. -->
+
+<!-- Library for better tooltips -->
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6"></script>
+
+<!-- Style for tooltips: -->
+
+<style>
+    .tippy-box[data-theme~='purple'] {
+    background-color: Thistle;
+	    color: #333;
+	    border: 2px solid Indigo;
+	    font-family: "Verdana", sans-serif;
+	    font-size: 100%;
+	    text-align: center;
+ }
+</style>
+
+<script type='text/javascript'>
+    tippy.setDefaultProps(
+			  { arrow: true,
+			    placement: 'right',
+			    interactive: true,
+			    theme: 'purple',
+			    allowHTML: true,
+			    delay: [800,200],
+			    animation: 'scale',
+			  }
+			  );
+all_tips = tippy('.with_tooltip');
+button_tip = tippy('.button_tooltip');
+copy_button = tippy('.confirmation', {trigger: 'manual', 
+				      duration: [100,1000],
+				      delay: [0,0],
+				      placement: 'auto',
+				      interactive: false,
+    });
+
+function copyCoords() {
+    /* Copy FOV coordinates to the system clipboard,
+       then display a confirmation message. 
+    */
+    navigator.clipboard.writeText(fov.coord_string);
+    // Hide the general tooltip if showing:
+    button_tip[0].hide; 
+    // Then show, pause, and hide the "copied!" message: 
+    copy_button[0].show();
+    sleep(800); 
+    copy_button[0].hide();
+};
 
 </script>
 
