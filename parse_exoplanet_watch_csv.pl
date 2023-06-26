@@ -261,7 +261,7 @@ foreach $p (@good_entries) {
 	$duration_hours,
 	$p->{'comment'}, 
 	$depth_ppt_string,
-	$p->{'rank'}, 
+	$p->{'fom_maint_rank'}, 
 	);
 
     push(@output_lines, \@line);
