@@ -139,6 +139,14 @@ our %observatories_western_north_america = (
 	   },
 
 
+	   "Winer Observatory" => {
+	       latitude => 31.665583,
+	       longitude => -110.60178,
+	       timezone_integer => 7,
+	       timezone => 'America/Phoenix',
+	   },
+
+
 	   "Apache Point Observatory" => {
 	       latitude => 32.780000,
 	       longitude => -105.820000,
