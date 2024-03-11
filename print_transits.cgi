@@ -2712,7 +2712,7 @@ sub finding_chart_page {
     my $chart_url;
     my $name = $target_ref->{name};
     if ($target_ref->{single_object}==1) {
-	$chart_url = "/create_finding_chart.cgi?"
+	$chart_url = "create_finding_chart.cgi?"
 	    . "target=$name"
 	    . "&ra=$target_ref->{ra}"
 	    . "&dec=$target_ref->{dec}";
