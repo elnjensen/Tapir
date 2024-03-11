@@ -2444,7 +2444,9 @@ sub get_eclipses {
 	# given helpful descriptive info in a modest amount of
 	# space:
 
-        $eclipse{csv_text} = eclipse_csv_entry(\%eclipse);
+        $eclipse{csv_text} = eclipse_csv_entry($use_utc, 
+                                               $observatory_timezone, 
+                                               \%eclipse);
 
 	push(@local_eclipse_times, $eclipse_jd);
 	push(@local_eclipse_info, \%eclipse);
@@ -2595,28 +2597,37 @@ sub eclipse_csv_entry {
     # a string with elevation, magnitude, etc.  This string is used in
     # the "Notes" field of the calendar when imported.
 
-    # Input: a hash reference to the hash with all the different
-    # fields of information about this particular target (e.g. name,
-    # coords, etc.) which can be used to construct the string.
-    # Output: returns a CSV string used in the calendar.  The string
-    # should end with "\n" so that each eclipse prints on a separate
-    # line. 
+    # Input: boolean specifying whether to use UTC; name of
+    # observatory timezone; and a hash reference to the hash with all
+    # the different fields of information about this particular target
+    # (e.g. name, coords, etc.) which can be used to construct the
+    # string.  Output: returns a CSV string used in the calendar.  The
+    # string should end with "\n" so that each eclipse prints on a
+    # separate line.
 
-    my $target_ref = shift @_;
+    my ($use_utc, $observatory_timezone, $target_ref) = (@_);
     # Convert the hash reference to a local hash:
     my %t = %$target_ref;
 
     # Create the basic comma-separated entry for the calendar, with
     # label, start date and time, end date and time, and a field
     # denoting that it is not an all-day event:
-    my $eclipse_entry = "Transit of $t{name},$t{start_date},"
-	. "$t{start_time},$t{end_date},$t{end_time},FALSE,";
+    my $eclipse_entry;
+    if ($use_utc) {
+	$eclipse_entry = "Transit of $t{name},$t{start_date_UTC},"
+	    . "$t{start_time_UTC},$t{end_date_UTC},$t{end_time_UTC},FALSE,";
+    } else {
+	$eclipse_entry = "Transit of $t{name},$t{start_date},"
+	    . "$t{start_time},$t{end_date},$t{end_time},FALSE,";
+    }
 
     # And also construct some notes that will appear in the
     # Description field of the calendar entry:
     my $note = "Transit of $t{name}; $t{ra} $t{dec};";
     $note .= " Elev. at start, mid, end: "
 	. "$t{start_el}, $t{mid_el}, $t{end_el}. ";
+    my $tz = $use_utc ? 'UTC' : $observatory_timezone;
+    $note .= "Dates/times in timezone $tz. ";
     chomp($t{comments});
     if ($t{comments} !~ /^\s*$/) { # Comment not empty
 	$note .= "Notes: $t{comments}";
@@ -2648,8 +2659,8 @@ sub eclipse_csv_entry {
     return $eclipse_entry;
     
 }
-
     
+
 
 sub target_info_page {
 
