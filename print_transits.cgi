@@ -2614,20 +2614,20 @@ sub eclipse_csv_entry {
     # denoting that it is not an all-day event:
     my $eclipse_entry;
     if ($use_utc) {
-	$eclipse_entry = "Transit of $t{name},$t{start_date_UTC},"
+	$eclipse_entry = "$t{name} transit,$t{start_date_UTC},"
 	    . "$t{start_time_UTC},$t{end_date_UTC},$t{end_time_UTC},FALSE,";
     } else {
-	$eclipse_entry = "Transit of $t{name},$t{start_date},"
+	$eclipse_entry = "$t{name} transit,$t{start_date},"
 	    . "$t{start_time},$t{end_date},$t{end_time},FALSE,";
     }
 
     # And also construct some notes that will appear in the
     # Description field of the calendar entry:
-    my $note = "Transit of $t{name}; $t{ra} $t{dec};";
-    $note .= " Elev. at start, mid, end: "
-	. "$t{start_el}, $t{mid_el}, $t{end_el}. ";
+    my $note = "Transit of $t{name} \n$t{ra} $t{dec} \n";
+    $note .= "Elev. at start, mid, end: "
+	. "$t{start_el}°, $t{mid_el}°, $t{end_el}°. \n";
     my $tz = $use_utc ? 'UTC' : $observatory_timezone;
-    $note .= "Dates/times in timezone $tz. ";
+    $note .= "Dates/times in timezone $tz. \n";
     chomp($t{comments});
     if ($t{comments} !~ /^\s*$/) { # Comment not empty
 	$note .= "Notes: $t{comments}";
