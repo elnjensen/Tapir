@@ -35,6 +35,12 @@ use strict;
 
 # Some observatory names have non-ASCII characters: 
 use utf8;
+
+# For local modules, make sure we include the current 
+# directory in the search path.
+use FindBin qw( $Bin ); 
+use lib $Bin;
+
 use Observatories qw(%observatories_asia
 		     %observatories_western_north_america
 		     %observatories_australia
