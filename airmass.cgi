@@ -31,6 +31,11 @@ use Math::Trig;
 use warnings;
 use strict;
 
+# For local modules, make sure we include the current 
+# directory in the search path.
+use FindBin qw( $Bin ); 
+use lib $Bin;
+
 use Observatories qw(%observatories_asia
 		     %observatories_western_north_america
 		     %observatories_australia

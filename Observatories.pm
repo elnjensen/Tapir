@@ -1,6 +1,6 @@
 package Observatories;
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2024 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -178,7 +178,6 @@ our %observatories_western_north_america = (
 	       timezone => 'PST8PDT',
 	   },
 
-
 	   "McDonald Observatory" => {
 	       latitude => 30.671667,
 	       longitude => -104.021667,
@@ -262,6 +261,13 @@ our %observatories_western_north_america = (
 	      longitude => -117.872065,
 	      timezone => 'America/Los_Angeles',
           },
+
+	  "Great Basin Observatory" => {
+	      latitude => 39.005691,
+	      longitude => -114.2199,
+	      timezone_integer => 8,
+	      timezone => 'America/Los_Angeles',
+	  },
 
 					   );
 
