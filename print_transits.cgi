@@ -2144,6 +2144,7 @@ sub get_eclipses {
 				   egress => ($dt_end -
 					              $dt_start)->to_hrs,        
 				   depth => $depth,
+                                   unc_hours => $midtime_uncertainty_hours,
 				   desired_baseline =>
 				                    $desired_baseline, 
 				   class => 'active',
@@ -3114,10 +3115,11 @@ sub transit_svg {
     # egress
     # end: end of the observable window. 
 
+    # unc_hours: optional uncertainty to display
+
     # It is always the case that start < end, and ingress < egress,
     # but the two pairs can be intermixed, e.g. we might not be able
     # to start observing until after ingress. 
-
 
     # Conversion factors from hours to pixels (for x), depth in ppt
     # to pixels (for y), and number of pixels to offset the y values 
@@ -3202,8 +3204,9 @@ sub transit_svg {
 
     my $y_delta = $ydepth;
 
+    my $xingress;
     if ($start <= $ingress) {
-	my $xingress = sprintf("%0.0f", $H2P * $ingress);
+	$xingress = sprintf("%0.0f", $H2P * $ingress);
 	$path .= "M $xstart $yzero H $xingress ";
 	if ($deep) {
 	    # Skip a bit of path and show hashes on the gap: 
@@ -3216,9 +3219,10 @@ sub transit_svg {
 	$path .= "M $xstart $ystart "; 
     }
 
+    my $xegress;
     if ($end > $egress) {
 	# Extend and draw the egress:
-	my $xegress = sprintf("%0.0f", $H2P * $egress);
+	$xegress = sprintf("%0.0f", $H2P * $egress);
 	$path .= "H $xegress "; 
 	$y_delta = $ydepth;
 	if ($deep) {
@@ -3233,13 +3237,37 @@ sub transit_svg {
     $path .= "H $xend "; 
     
     # If it was too wide and we drew that part of the transit, add a
-    # has mark to show that: 
+    # hash mark to show that: 
     if ($wide and ($start < $mid) and ($end > $mid)) {
 	$path .= sprintf("M %0.0f %0.f %s", $mid*$H2P, $ydepth + $yzero, $hash);
     }
 
-    return $path . '"/>';
-    
+    $path .= '"/>';
+
+    # If uncertainty was passed in, draw a light rectangle at 
+    # ingress and/or egress showing how uncertain those times are: 
+    if (defined $a->{'unc_hours'}) {
+	my $unc = $a->{'unc_hours'} * $H2P;
+	# How much to increase rect dimensions to account for stroke: 
+	my $rect_pad = 18;
+	my $plot_depth = max($ydepth + $rect_pad*2, D2P*MINDEPTH*7);
+	foreach my $start ($xingress, $xegress) {
+	    # Only draw the rectangle if the ingress/egress is
+	    # visible, and the uncertainty would be more than
+	    # the transit stroke width:
+	    if ($start and ($unc > $rect_pad)) {
+		my $rect = sprintf("<rect $transform " . 
+				   'width="%0.0f" height="%0.0f" ' .
+				   'x="%0.0f" y="%0.0f"/>', 
+				   2*$unc, $plot_depth,
+				   $start - $unc, $yzero - $rect_pad);
+		$path .= " $rect";
+	    }
+	}
+    }
+	    
+
+    return $path;
 }
 
 sub bjd2utcjd {
