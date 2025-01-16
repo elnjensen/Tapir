@@ -2,7 +2,7 @@
 
 # Web interface to provide a form for calculating transit visibility. 
 
-# Copyright 2012-2023 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2025 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -27,6 +27,7 @@
 use CGI;
 use CGI::Cookie;
 use Math::Trig;
+use HTML::Entities qw( encode_entities );
 
 use JSON qw(decode_json); 
 
@@ -49,6 +50,29 @@ use Observatories qw(%observatories_asia
 		     %observatories_south_america
 		     %observatories_eastern_us
 		     );
+
+sub num_only {
+    # Take input and return a string that includes only
+    # characters that match the pattern we expect for 
+    # numbers.  In addition to digits, we allow plus and 
+    # minus signs, both period and comma (both could be 
+    # decimal separators depending on locale), and colon
+    # to allow for colon-separated sexagesimal coords. 
+    # Whitespace is also allowed. 
+
+    my $input = shift @_;
+    # Needs to have at least one digit to be a valid number: 
+    if ((not defined($input)) or ($input !~ /\d/)) {
+	return "";
+    } else {
+	# Keep only relevant symbols:
+	$input =~ s/[^\d+-.,:\s]//g;
+	# Replace inadvertent double-minus or plus with a single one: 
+	$input =~ s/-{2,}/-/g;
+	$input =~ s/\+{2,}/\+/g;
+	return $input;
+    }
+}
 
 # Get the user's approxiomate location from IP address: 
 my $info = `curl --silent https://ipinfo.io/json`; 
@@ -105,35 +129,38 @@ if (not defined $observatory_string) {
 # If they don't have a cookie set for latitude and longitude, 
 # then default to what we get from their IP address:
 if (defined $cookies{'observatory_latitude'}) {
-    $observatory_latitude = $cookies{'observatory_latitude'}->value;
+    $observatory_latitude = num_only(scalar
+				     $cookies{'observatory_latitude'}->value);
 } 
 if (not defined $observatory_latitude) {
     $observatory_latitude = $lat;
 }
 
 if (defined $cookies{'observatory_longitude'}) {
-    $observatory_longitude = $cookies{'observatory_longitude'}->value;
+    $observatory_longitude = num_only(scalar
+				      $cookies{'observatory_longitude'}->value);
 }
 if (not defined $observatory_longitude) {
     $observatory_longitude = $lon;
 }
 
 if (defined $cookies{'observatory_timezone'}) {
-    $observatory_timezone = $cookies{'observatory_timezone'}->value;
+    $observatory_timezone = encode_entities(scalar
+				     $cookies{'observatory_timezone'}->value);
 }
 if (not defined $observatory_timezone) {
     $observatory_timezone = '';
 }
 
 if (defined $cookies{'Use_UTC'}) {
-    $use_utc = $cookies{'Use_UTC'}->value;
+    $use_utc = num_only(scalar $cookies{'Use_UTC'}->value);
 }
 if (not defined $use_utc) {
     $use_utc = 0;
 }
 
 if (defined $cookies{'Show_uncertainty'}) {
-    $show_unc = $cookies{'Show_uncertainty'}->value;
+    $show_unc = num_only(scalar $cookies{'Show_uncertainty'}->value);
 }
 if (not defined $show_unc) {
     $show_unc = 1;
@@ -152,14 +179,14 @@ if (defined $cookies{'Use_AND'}) {
 }
 
 if (defined $cookies{'days_to_print'}) {
-    $days_to_print = $cookies{'days_to_print'}->value;
+    $days_to_print = num_only(scalar $cookies{'days_to_print'}->value);
 }
 if (not defined $days_to_print) {
     $days_to_print = 3;
 }
 
 if (defined $cookies{'days_in_past'}) {
-    $days_in_past = $cookies{'days_in_past'}->value;
+    $days_in_past = num_only(scalar $cookies{'days_in_past'}->value);
 }
 if (not defined $days_in_past) {
     $days_in_past = 0;
@@ -167,7 +194,7 @@ if (not defined $days_in_past) {
 
 if (defined $cookies{'minimum_start_elevation'}) {
     $minimum_start_elevation 
-	= $cookies{'minimum_start_elevation'}->value;
+	= num_only(scalar $cookies{'minimum_start_elevation'}->value);
 }
 if (not defined $minimum_start_elevation) {
     $minimum_start_elevation = '30';
@@ -175,28 +202,28 @@ if (not defined $minimum_start_elevation) {
 
 if (defined $cookies{'minimum_end_elevation'}) {
     $minimum_end_elevation 
-	= $cookies{'minimum_end_elevation'}->value;
+	= num_only(scalar $cookies{'minimum_end_elevation'}->value);
 }
 if (not defined $minimum_end_elevation) {
     $minimum_end_elevation = '30';
 }
 
 if (defined $cookies{'minimum_ha'}) {
-    $minimum_ha = $cookies{'minimum_ha'}->value;
+    $minimum_ha = num_only(scalar $cookies{'minimum_ha'}->value);
 }
 if (not defined $minimum_ha) {
     $minimum_ha = '';
 }
 
 if (defined $cookies{'maximum_ha'}) {
-    $maximum_ha = $cookies{'maximum_ha'}->value;
+    $maximum_ha = num_only(scalar $cookies{'maximum_ha'}->value);
 }
 if (not defined $maximum_ha) {
     $maximum_ha = '';
 }
 
 if (defined $cookies{'minimum_depth'}) {
-    $minimum_depth = $cookies{'minimum_depth'}->value;
+    $minimum_depth = num_only(scalar $cookies{'minimum_depth'}->value);
 }
 if (not defined $minimum_depth) {
     $minimum_depth = 0;
@@ -204,21 +231,21 @@ if (not defined $minimum_depth) {
 
 
 if (defined $cookies{'baseline_hrs'}) {
-    $baseline_hrs = $cookies{'baseline_hrs'}->value;
+    $baseline_hrs = num_only(scalar $cookies{'baseline_hrs'}->value);
 }
 if (not defined $baseline_hrs) {
     $baseline_hrs = 1;
 }
 
 if (defined $cookies{'minimum_priority'}) {
-    $minimum_priority = $cookies{'minimum_priority'}->value;
+    $minimum_priority = num_only(scalar $cookies{'minimum_priority'}->value);
 }
 if (not defined $minimum_priority) {
     $minimum_priority = 0;
 }
 
 if (defined $cookies{'maximum_V_mag'}) {
-    $maximum_V_mag = $cookies{'maximum_V_mag'}->value;
+    $maximum_V_mag = num_only(scalar $cookies{'maximum_V_mag'}->value);
 }
 if (not defined $maximum_V_mag) {
     $maximum_V_mag = '';
@@ -226,7 +253,7 @@ if (not defined $maximum_V_mag) {
 
 # Setting of Sun elevation that defines night:
 if (defined $cookies{'twilight'}) {
-    $twilight = $cookies{'twilight'}->value;
+    $twilight = num_only(scalar $cookies{'twilight'}->value);
 }
 if (not defined $twilight) {
     $twilight = -12;
@@ -234,7 +261,7 @@ if (not defined $twilight) {
 
 # Setting of maximum airmass to plot:
 if (defined $cookies{'max_airmass'}) {
-    $max_airmass = $cookies{'max_airmass'}->value;
+    $max_airmass = num_only(scalar $cookies{'max_airmass'}->value);
 }
 # Make sure this has a sensible value: 
 if ((not defined $max_airmass) or ($max_airmass < 1)) {
@@ -243,7 +270,7 @@ if ((not defined $max_airmass) or ($max_airmass < 1)) {
 
 # Parameters for showing the detector FOV overlay in Aladin: 
 if (defined $cookies{'showFov'}) {
-    $show_fov = $cookies{'showFov'}->value;
+    $show_fov = num_only(scalar $cookies{'showFov'}->value);
 }
 if (not defined $show_fov) {
     $show_fov = 0;
@@ -252,21 +279,21 @@ if (not defined $show_fov) {
 my $fov_checked = ($show_fov) ? "checked" : "";
 
 if (defined $cookies{'fovWidth'}) {
-    $fov_width = $cookies{'fovWidth'}->value;
+    $fov_width = num_only(scalar $cookies{'fovWidth'}->value);
 }
 if (not defined $fov_width) {
     $fov_width = '';
 }
 
 if (defined $cookies{'fovHeight'}) {
-    $fov_height = $cookies{'fovHeight'}->value;
+    $fov_height = num_only(scalar $cookies{'fovHeight'}->value);
 }
 if (not defined $fov_height) {
     $fov_height = '';
 }
 
 if (defined $cookies{'fovPA'}) {
-    $fov_PA = $cookies{'fovPA'}->value;
+    $fov_PA = num_only(scalar $cookies{'fovPA'}->value);
 }
 if (not defined $fov_PA) {
     $fov_PA = '';
