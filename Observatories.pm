@@ -496,6 +496,13 @@ our %observatories_eastern_us = (
 	       timezone => 'EST5EDT',
 	   },
 
+	   "Michigan State Univ. Observatory" => {
+	       latitude => 42.70661726940,
+	       longitude => -84.482705745073,
+	       timezone_integer => 5,
+	       timezone => 'EST5EDT',
+	   },
+
 	   "Collins Observatory, Colby College, Maine" => {
 	       latitude => 44.56667,
 	       longitude =>  -69.656378,
