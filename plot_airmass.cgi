@@ -4,7 +4,7 @@
 # target.  Input parameters are provided by airmass.cgi, which calls
 # this script. 
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2025 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -40,11 +40,15 @@ use Astro::PAL;
 use DateTime::Format::Epoch::JD;
 use DateTime::Format::RFC3339;
 use SVG::TT::Graph::TimeSeries;
-use CGI;
+use CGI qw/ -utf8 /;
 use CGI::Cookie;
 use LWP::Simple;
 use Math::Trig;
 use HTML::Entities;
+
+# Some observatory names have non-ASCII characters: 
+use utf8;
+binmode(STDOUT, ":utf8");
 
 use strict;
 use warnings;
@@ -82,8 +86,8 @@ if ($observatory_string !~ /$flag_for_manual_entry/) {
     # add a period to the name for later printing ease:
     $observatory_name =  encode_entities($observatory_name) . ". ";
 } else {
-    $observatory_longitude = $q->param("observatory_longitude");
-    $observatory_latitude = $q->param("observatory_latitude");
+    $observatory_longitude = num_only(scalar $q->param("observatory_longitude"));
+    $observatory_latitude = num_only(scalar $q->param("observatory_latitude"));
     $temporary_timezone = $q->param("timezone");
     $observatory_name = "";
     push @cookies, define_cookie('observatory_latitude', 
@@ -105,7 +109,7 @@ if ($timezone eq '') {
 }
 
 # Check to see if they set the parameter to use UTC no matter what:
-my $use_utc = $q->param("use_utc");
+my $use_utc = num_only(scalar $q->param("use_utc"));
 if ((not defined $use_utc) or ($use_utc eq "")) {
     $use_utc = 0;
 }
@@ -119,19 +123,19 @@ if ($use_utc) {
 
 
 # Check to see if they set the parameter to invert colors:
-my $invert = $q->param("invert");
+my $invert = num_only(scalar $q->param("invert"));
 if ((not defined $invert) or ($invert eq "")) {
     $invert = 0;
 }
 
 # Check to see if they set the parameter to plot Moon position:
-my $plot_moon = $q->param("plot_moon");
+my $plot_moon = num_only(scalar $q->param("plot_moon"));
 if ((not defined $plot_moon) or ($plot_moon eq "")) {
     $plot_moon = 0;
 }
 
 # Check to see if they set the parameter to change airmass scale:
-my $max_airmass = num_only($q->param("max_airmass"));
+my $max_airmass = num_only(scalar $q->param("max_airmass"));
 if ((not defined $max_airmass) or ($max_airmass eq "")) {
     $max_airmass = 2.4;
 }
@@ -140,7 +144,7 @@ push @cookies, define_cookie('max_airmass',
 			     $max_airmass);
 
 # Check to see if they set the parameter to plot right-hand labels:
-my $elevation_labels = $q->param("elevation_labels");
+my $elevation_labels = num_only(scalar $q->param("elevation_labels"));
 if ((not defined $elevation_labels) or ($elevation_labels eq "")) {
     $elevation_labels = 1;
 }
@@ -149,12 +153,12 @@ push @cookies, define_cookie('invert',
 			     $invert);
 
 
-my $jd = num_only($q->param("jd"));
-my $jd_start = num_only($q->param("jd_start"));
-my $jd_end = num_only($q->param("jd_end"));
+my $jd = num_only(scalar $q->param("jd"));
+my $jd_start = num_only(scalar $q->param("jd_start"));
+my $jd_end = num_only(scalar $q->param("jd_end"));
 
 # Start date:
-my $start_date_string = encode_entities($q->param("start_date"));
+my $start_date_string = encode_entities(scalar $q->param("start_date"));
 if ((not defined $start_date_string) or ($start_date_string eq "")) {
     $start_date_string = 'today';
 }
@@ -171,8 +175,8 @@ if (not defined($jd_end)) {
     $jd_end = "";
 }
 
-# Sometimes abbreviated versions of the transit start/end times might
-# be passed in; fix them.
+# Sometimes abbreviated versions of the transit start/end times or the
+# base JD might be passed in; fix them.
 if ($jd_start ne "") {
     if ($jd_start < 50000) {
 	$jd_start += 2450000;
@@ -189,10 +193,18 @@ if ($jd_end ne "") {
     }
 }
 
+if ($jd ne "") {
+    if ($jd < 50000) {
+	$jd += 2450000;
+    } elsif ($jd < 2000000) {
+	$jd += 2400000;
+    }
+}
 
-my $ra = num_only($q->param("ra"));
-my $dec = num_only($q->param("dec"));
-my $target_input = encode_entities($q->param("target"));
+
+my $ra = num_only(scalar $q->param("ra"));
+my $dec = num_only(scalar $q->param("dec"));
+my $target_input = encode_entities(scalar $q->param("target"));
 
 # Choose an alternate Vizier mirror if one isn't working:
 #my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
