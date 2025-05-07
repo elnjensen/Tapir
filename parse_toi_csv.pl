@@ -72,8 +72,14 @@ foreach my $a (@$csv_lines) {
 
 }
     
-# Finally, write this out to a CSV file: 
-my $status = Text::CSV::csv(in => \@output_lines, 
-			    out => *STDOUT,
-			    encoding => "UTF-8",
-); 
+# Finally, write this out to a CSV file, as long as we have some
+# viable targets, i.e. the length of the array is greater than just
+# the initial header line:
+if ($#output_lines > 0) {
+    my $status = Text::CSV::csv(in => \@output_lines,
+				out => *STDOUT,
+				encoding => "UTF-8",
+	);
+} else {
+    print STDERR "Failed to fetch any TOI targets.\n";
+}
