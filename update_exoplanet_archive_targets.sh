@@ -21,7 +21,7 @@ DIR=/home/httpd/html/transits/
 cd $DIR
 
 # Get file, and sort it by all except the first line.  Save as a temporary file: 
-curl --silent --fail 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_name,pl_orbper,pl_orbpererr1,pl_orbpererr2,pl_orbsmax,pl_orbincl,rastr,decstr,ra,dec,st_rad,pl_radj,pl_trandep,pl_trandur,pl_trandurerr1,pl_trandurerr2,pl_tranmid,pl_tranmiderr1,pl_tranmiderr2,pl_imppar,pl_ratdor,pl_ratror,sy_vmag,sy_gaiamag+from+ps+where+tran_flag=1&format=csv' | awk 'NR<2{ print; next }{ print | "sort" }' > $NEW_FILE
+curl --silent --fail 'https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_name,pl_orbper,pl_orbpererr1,pl_orbpererr2,pl_orbsmax,pl_orbincl,rastr,decstr,ra,dec,st_rad,pl_radj,pl_trandep,pl_trandur,pl_trandurerr1,pl_trandurerr2,pl_tranmid,pl_tranmiderr1,pl_tranmiderr2,pl_imppar,pl_ratdor,pl_ratror,sy_vmag,sy_gaiamag,pl_refname+from+ps+where+tran_flag=1&format=csv' | awk 'NR<2{ print; next }{ print | "sort" }' > $NEW_FILE
 
 
 # If non-zero size and different from the old file, replace the old file: 
