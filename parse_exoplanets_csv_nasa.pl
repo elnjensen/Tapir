@@ -277,6 +277,18 @@ while ($i < $n_good) {
     # Get the "default parameters" entry for this system: 
     my $pars = $default_pars{$p_best->{'pl_name'}};
 
+    # Reference for ephemeris:
+    $p_best->{'comment'} .= "Ephemeris from " .
+	$p_best->{'pl_refname'} . ". ";
+    if ($p_best->{'pl_refname'} =~ /ExoFOP-TESS/) {
+	# The link for TESS ephemerides is just a link to a table with
+	# all of the TOIs; point to a specific page:
+	$p_best->{'comment'} =~ s/ExoFOP-TESS TOI/ExoFOP-TESS/;
+	my $search_name = $p_best->{'pl_name'};
+	$search_name =~ s/ //g; # Remove spaces
+	$p_best->{'comment'} =~ s%view_toi.php%target.php\?id=$search_name%;
+    }
+
     # Get magnitude from default params: 
     if ($pars->{'sy_vmag'} ne '') {
 	$V = sprintf("%0.1f", $pars->{'sy_vmag'});
