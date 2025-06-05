@@ -206,12 +206,12 @@ my $ra = num_only(scalar $q->param("ra"));
 my $dec = num_only(scalar $q->param("dec"));
 my $target_input = encode_entities(scalar $q->param("target"));
 
-# Choose an alternate Vizier mirror if one isn't working:
-#my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
-my $vizier_mirror = "https://vizier.cfa.harvard.edu/cgi-bin/";
+my $vizier_mirror = "https://vizier.cds.unistra.fr/cgi-bin/";
+# This mirror seems to be unresponsive as of June 2025
+#my $vizier_mirror = "https://vizier.cfa.harvard.edu/cgi-bin/";
 
 if (($ra eq '') and ($target_input ne '')) {
-    # No RA given, try to resolve name with Simbad:
+    # No RA given, try to resolve name with Vizier:
     # First vet the name against a regular expression; since we pass
     # it back out in a URL, we want to be careful about what is in
     # that string:
