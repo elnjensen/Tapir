@@ -4,7 +4,7 @@
 # parameters come from finding_charts.cgi, and the finding chart is
 # created by calling the script get_finding_charts.pl.
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2024 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -43,19 +43,19 @@ my $script_contact_person = 'Eric Jensen, ejensen1@swarthmore.edu';
 
 # Get some input settings from the URL:
 
-my $ra = num_only($q->param("ra"));
-my $dec = num_only($q->param("dec"));
-my $field_width = num_only($q->param("field_width"));
-my $field_height = num_only($q->param("field_height"));
-my $show_detector = num_only($q->param("show_detector"));
-my $detector_width = num_only($q->param("detector_width"));
-my $detector_height = num_only($q->param("detector_height"));
+my $ra = num_only(scalar $q->param("ra"));
+my $dec = num_only(scalar $q->param("dec"));
+my $field_width = num_only(scalar $q->param("field_width"));
+my $field_height = num_only(scalar $q->param("field_height"));
+my $show_detector = num_only(scalar $q->param("show_detector"));
+my $detector_width = num_only(scalar $q->param("detector_width"));
+my $detector_height = num_only(scalar $q->param("detector_height"));
 
 # This gets checked later: 
 my $target_input = $q->param("target");
 
 # Check to see if they set the parameter to invert colors:
-my $invert = num_only($q->param("invert"));
+my $invert = num_only(scalar $q->param("invert"));
 if ((not defined $invert) or ($invert eq "")) {
     $invert = 0;
 }
@@ -67,12 +67,12 @@ push @cookies, define_cookie('invert',
 
 my $target_name;
 
-# Choose an alternate Vizier mirror if one isn't working:
-my $vizier_mirror = "https://cdsweb.u-strasbg.fr/cgi-bin/";
-#my $vizier_mirror = "https://vizier.cfa.harvard.edu/viz-bin/";
+my $vizier_mirror = "https://vizier.cds.unistra.fr/cgi-bin/";
+# This mirror seems to be unresponsive as of June 2025
+#my $vizier_mirror = "https://vizier.cfa.harvard.edu/cgi-bin/";
 
 if (($ra eq '') and ($target_input ne '')) {
-    # No RA given, try to resolve name with Simbad:
+    # No RA given, try to resolve name with Vizier:
     # First vet the name against a regular expression; since we pass
     # it back out in a URL, we want to be careful about what is in
     # that string:
@@ -140,7 +140,7 @@ my $coords = new Astro::Coords( ra => $ra,
 				type => 'J2000',
 				);
 
-if ((not defined($coords)) or ($ra >= 24)) {
+if ((not defined($coords)) or (($ra !~ /:/) and ($ra >= 24))) {
     my $err_title = "Could not parse coordinates";
     my $err_message = "Could not parse the coordinates RA = [$ra]" 
 	. " and/or Dec = [$dec].<br />  Note: square brackets are not part"
