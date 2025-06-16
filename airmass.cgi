@@ -229,7 +229,13 @@ print << "END_1";
 
 <html>
 <head>
+  <title>Airmass Plots</title>
   <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
+
+  <!-- JQuery UI Datepicker -->
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
 
 <script type="text/javascript">
 
@@ -263,22 +269,25 @@ print << "END_1";
        }
    }
 
+   // Initialize datepicker objects
+   \$( function() {
+      // Regular expression for mm-dd-yyyy or m-d-yyyy
+      const re =/\\d{1,2}-\\d{1,2}-\\d{4}/
+      \$( ".datepicker" ).datepicker({
+        dateFormat: "mm-dd-yy",
+        constrainInput: false
+      }).change(function() {
+        // When date is changed, check to see if not a valid date format or not "today" then invalidate entry
+        const dateInput = \$(this).val();
+        if (!re.test(dateInput) && dateInput.toLowerCase() != "today") {
+            \$(this).datepicker("setDate", "");
+        }
+      });
+   });
+
 </script>
 
 
-<script type="text/javascript" 
-    src="./src/date-picker-v5/js/lang/en.js">
-</script>
-
-<script type="text/javascript" 
-    src="./src/date-picker-v5/js/datepicker.packed.js">
-</script>
-
-<link href="./src/date-picker-v5/css/datepicker.css" 
-    rel="stylesheet" type="text/css" />
-
-
-<title>Airmass Plots</title>
     
 <link rel="stylesheet" href="page_style.css" type="text/css">
 
@@ -510,15 +519,9 @@ print << "END_3";
 
 <p>
 Date for airmass plot (mm-dd-yyyy or <i>'today'</i>): 
-<input type="text" value="today" size="15"
-    id="start_date" name="start_date"  style="text-align:center" />
+<input type="text"  size="15" value="today"
+    id="start_date" name="start_date"  class="datepicker" style="text-align:center" />
 </p>
-
-<script type="text/javascript">
-  datePickerController.createDatePicker(
-	     {formElements:{"start_date":"m-ds-d-ds-Y"}}
-					);
-</script>
 
 <p>
 Target name:
