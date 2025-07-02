@@ -323,6 +323,13 @@ our %observatories_europe = (
 	       timezone => 'Europe/Madrid',
 	   },
 
+    	   "Montsec Observatory, Spain" => {
+	       latitude => 42.051695,
+	       longitude => 0.729684,
+	       timezone_integer => -1,
+	       timezone => 'Europe/Madrid',
+	   },
+
 	   "Observatorio de Sierra Nevada, Spain" => {
 	       latitude => 37.064167,
 	       longitude => -3.384722,
