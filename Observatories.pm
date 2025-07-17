@@ -219,11 +219,19 @@ our %observatories_western_north_america = (
 	       timezone => 'MST7MDT',
 	   },
 
-	   "Boyce-Astro Research Observatory (San Diego)" => {
-	       latitude => 32.6133,
-	       longitude => -116.3319,
+	   "Boyce-Astro Research Observatory" => {
+	       latitude => 32.613,
+	       longitude => -116.332,
 	       timezone => 'America/Los_Angeles',
-	   }, 
+	       shortname => "BARO",
+           },
+
+	   "Boyce-Astro Research Observatory North" => {
+	       latitude => 37.071,
+	       longitude => -119.413,
+	       timezone => 'America/Los_Angeles',
+	       shortname => "BARON",
+           },
 
 	   "Rothney Astrophysical Observatory (Calgary)" => {
 	       latitude => 50.868039,
@@ -379,6 +387,12 @@ our %observatories_europe = (
 	       timezone => 'Europe/Berlin',
 	   },
 
+           "Obserwatorium Astronomiczne Niedźwiady" => {
+	       latitude => 53.062,
+	       longitude => 17.681,
+	       timezone => 'Europe/Warsaw',
+	       shortname => "OAN",
+           },
 			    );
 
 our %observatories_africa = (
