@@ -1358,7 +1358,7 @@ if ($print_html) {   # True for either 1 or 2
 		     observatory_shortname => $observatory_shortname,
 		     observing_from_space => $observing_from_space,
 		     observatory_string =>
-		       uri_escape($observatory_string),
+		       uri_escape_utf8($observatory_string),
 		     minimum_start_elevation => 
 		       $minimum_start_elevation,
 		     minimum_end_elevation => 
