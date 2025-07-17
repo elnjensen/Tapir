@@ -49,6 +49,7 @@ use Observatories qw(%observatories_asia
 		     %observatories_africa
 		     %observatories_south_america
 		     %observatories_eastern_us
+		     %observatories_lco
 		     );
 
 sub num_only {
@@ -328,6 +329,7 @@ my @observatory_list = (
 			 \%observatories_eastern_us,
 			 \%observatories_western_north_america,
 			 \%observatories_south_america,
+			 \%observatories_lco,
 			 );
 
 my @observatory_label = ( "Africa",
@@ -337,6 +339,7 @@ my @observatory_label = ( "Africa",
 			  "North America - East",
 			  "North America - Central, West, and Hawaii",
 			  "South America",
+			  "LCO",
 			  );
 
 

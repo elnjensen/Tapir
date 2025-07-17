@@ -1,6 +1,6 @@
 package Observatories;
 
-# Copyright 2012-2024 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2025 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -42,6 +42,7 @@ our @EXPORT = qw(%observatories_asia
 		 %observatories_africa
 		 %observatories_south_america
 		 %observatories_eastern_us
+		 %observatories_lco
 		 );
 
 
@@ -219,11 +220,19 @@ our %observatories_western_north_america = (
 	       timezone => 'MST7MDT',
 	   },
 
-	   "Boyce-Astro Research Observatory (San Diego)" => {
-	       latitude => 32.6133,
-	       longitude => -116.3319,
+	   "Boyce-Astro Research Observatory" => {
+	       latitude => 32.613,
+	       longitude => -116.332,
 	       timezone => 'America/Los_Angeles',
-	   }, 
+	       shortname => "BARO",
+           },
+
+	   "Boyce-Astro Research Observatory North" => {
+	       latitude => 37.071,
+	       longitude => -119.413,
+	       timezone => 'America/Los_Angeles',
+	       shortname => "BARON",
+           },
 
 	   "Rothney Astrophysical Observatory (Calgary)" => {
 	       latitude => 50.868039,
@@ -379,6 +388,12 @@ our %observatories_europe = (
 	       timezone => 'Europe/Berlin',
 	   },
 
+           "Obserwatorium Astronomiczne Niedźwiady" => {
+	       latitude => 53.062,
+	       longitude => 17.681,
+	       timezone => 'Europe/Warsaw',
+	       shortname => "OAN",
+           },
 			    );
 
 our %observatories_africa = (
@@ -667,5 +682,56 @@ our %observatories_eastern_us = (
 	   },
 				);
 
+our %observatories_lco = (
 
+	"LCO South African Astronomical, 0.4m/1m" => {
+		 latitude => -32.38,
+		 longitude => 20.81,
+		 timezone => 'Africa/Johannesburg',
+		 shortname => "LCO South Africa",
+	},
+
+	"LCO Siding Spring, 0.4m/1m/2m" => {
+		 latitude => -31.2733,
+		 longitude => 149.071,
+		 timezone => 'Australia/Sydney',
+		 shortname => "LCO Siding Spring",
+	},
+
+	"LCO Teide, 0.4m" => {
+		 latitude => 28.3,
+		 longitude => -16.5097,
+		 timezone => 'Atlantic/Canary',
+		 shortname => "LCO Teide 0.4m",
+	},
+
+	"LCO Byrne Observatory Sedgwick, California (BOS)" => {
+		 latitude => 34.69139,
+		 longitude => -120.04222,
+		 timezone => 'PST8PDT',
+		 shortname => "LCO Byrne BOS",
+	},
+
+	"LCO Haleakala, 0.4m/2m" => {
+		 latitude => 20.7075,
+		 longitude => -156.256,
+		 timezone => 'Pacific/Honolulu',
+		 shortname => "LCO Haleakala",
+	},
+
+	"LCO McDonald, 0.4m/1m" => {
+		 latitude => 30.67,
+		 longitude => -104.02,
+		 timezone => 'US/Central',
+		 shortname => "LCO McDonald",
+	},
+
+	"LCO Cerro Tololo Interamerican, 0.4m/1m" => {
+		 latitude => -30.1674,
+		 longitude => -70.8048,
+		 timezone => 'America/Santiago',
+		 shortname => "LCO Cerro Tololo",
+	},
+
+    );
 
