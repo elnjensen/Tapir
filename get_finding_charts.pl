@@ -7,7 +7,7 @@
 # way.  Can be run from the command-line, or called by the web
 # interface create_finding_charts.cgi.
 
-# Copyright 2012-2022 Eric Jensen, ejensen1@swarthmore.edu.
+# Copyright 2012-2025 Eric Jensen, ejensen1@swarthmore.edu.
 # 
 # This file is part of the Tapir package, a set of (primarily)
 # web-based tools for planning astronomical observations.  For more
@@ -132,6 +132,12 @@ Options:
 	  much about how long it takes you to make a bunch of charts.
  --skip: Number of lines to skip at the beginning of the input. Useful 
          if your input file has headers that aren\'t commented out.
+ --check-coords: If a file of the same name exists, check for coords
+                 in the metadata to make sure they are the same as
+                 input.  If the coords don\'t match, overwrite the 
+		 image using the new coords.
+ --outer-circle-arcmin: Number of arcminutes for
+                 radius of outer circle; defaults to 1.
  --help: Print this help.
 
 END_OF_HELP
@@ -148,7 +154,8 @@ our ($coords_only, $show_detector, $show_guider, $new_suffix,
     $detector_width, $detector_height, $guider_width, $guider_height,
     $guider_offset_x, $guider_offset_y, $print_help, $sleep_seconds,
     $original_input, $force_overwrite, $to_stdout, $quiet, $skip,
-    $skipped, $hardlink_from_dir,
+    $skipped, $check_coords, $pixels_per_inch,
+    $outer_circle_arcmin, $hardlink_from_dir,
     );
 
 BEGIN {
@@ -175,6 +182,8 @@ BEGIN {
 			    "sleep=f" => \$sleep_seconds,
 			    "invert!" => \$white_background,
 			    "skip=f" => \$skip,
+			    "outer-circle-arcmin=f" => \$outer_circle_arcmin,
+			    "check-coords" => \$check_coords,
 			    );
     
     if ($print_help or not $success) {
@@ -208,6 +217,11 @@ BEGIN {
 # Field width in arcmin:
     if (not defined($field_width)) {
 	$field_width = 40;
+    }
+
+# Outer circle radius in arcmin:
+    if (not defined($outer_circle_arcmin)) {
+	$outer_circle_arcmin = 1;
     }
 
 
@@ -295,7 +309,7 @@ if ($new_suffix =~ /jpe?g/i) {
 # the annotation color, since yellow on white doesn't show up.  (Tweak
 # colors here as desired.)
 
-# Color for the larger, 1 arcminute circle:
+# Color for the larger circle:
     $circle_color2 = "orange";
 
     if ($white_background) {
@@ -443,20 +457,42 @@ if (not (defined($ra1) and defined($ra2) and defined($ra3) and
 next if ($coords_only);
 
 # Construct the URL to fetch:
+# my $url =
+#     sprintf('https://archive.stsci.edu/cgi-bin/dss_search?v=' 
+# 	    . 'poss2ukstu_red&r=%02d+%02d+%05.2f&d=%3s+%02d+%04.1f&e='
+# 	    . 'J2000&h=%0.1f&w=%0.1f&f=gif&c=none&fov=NONE&v3=',
+# 	    $ra1, $ra2, $ra3, $dec1, $dec2, $dec3, $field_height, 
+# 	    $field_width);
+# my $suffix = ".gif";
+
+my $ra_deg = RA_hms_to_deg($ra1, $ra2, $ra3);
+my $dec_deg = Dec_dms_to_deg($dec1, $dec2, $dec3);
+
+my $pix_width = 1800;
+
 my $url =
-    sprintf('https://archive.stsci.edu/cgi-bin/dss_search?v=' 
-	    . 'poss2ukstu_red&r=%02d+%02d+%05.2f&d=%3s+%02d+%04.1f&e='
-	    . 'J2000&h=%0.1f&w=%0.1f&f=gif&c=none&fov=NONE&v3=',
-	    $ra1, $ra2, $ra3, $dec1, $dec2, $dec3, $field_height, 
-	    $field_width);
+    sprintf('https://alasky.cds.unistra.fr/hips-image-services/hips2fits?' .
+	    'hips=CDS%%2FP%%2FDSS2%%2Fcolor&width=%d&height=%d&' .
+	    'projection=TAN&ra=%0.6f&dec=%0.6f&format=jpg&fov=%0.6f',
+	    $pix_width, $pix_width,
+	    $ra_deg, $dec_deg, $field_height/60.);
+my $suffix = ".jpg";
 
 
 # Construct the temporary filename to receive the downloaded image:
-my $file = "/tmp/finding_chart_" . md5_hex($name, time()) . ".gif";
+my $file = "/tmp/finding_chart_" . md5_hex($name, time()) . $suffix;
 
 if (not defined $to_stdout) {
     $to_stdout = 0;
 }
+
+# Construct the coordinate string that will go in the "comment" field,
+# which allows us to make sure a file of the same name is really at
+# the same coords.  Use the same format string we used to construct
+# the URL, so we'll match even if coords are different in some
+# insignificant decimal place. 
+my $coord_string =  sprintf('%02d:%02d:%05.2f %3s:%02d:%04.1f',
+			    $ra1, $ra2, $ra3, $dec1, $dec2, $dec3);
 
 my $new_file;
 if ($to_stdout) {
@@ -486,10 +522,25 @@ if ($to_stdout) {
     # See if the file already exists and has non-zero size - if so,
     # we're done, just short-circuit the loop (unless the user has
     # specifically asked to overwrite):
-    if ((-s $new_file) and not ($force_overwrite)) {
-	print STDERR "File $new_file already exists!  (Use --force to overwrite.)"
-	    . " Going to next target.\n";
-	next;
+    if (-s $new_file) {
+	my $coord_match = 1;
+	if ($check_coords) {
+	    my $file_coords = `identify -format %c $new_file |grep Coords`;
+	    chomp($file_coords);
+	    $file_coords =~ s/Coords: //;
+	    if ($file_coords ne $coord_string) {
+		print STDERR "Coord mismatch for $new_file. " . 
+		  "Embedded: $file_coords vs. new: $coord_string.\n";
+		$coord_match = 0;
+	    }
+	}
+	# If coords don't match we overwrite; but if they do match,
+	# check for the --force flag: 
+	if ($coord_match and (not $force_overwrite)) {
+	    print STDERR "File $new_file already exists!  (Use --force to overwrite.)"
+		. " Going to next target.\n";
+	    next;
+	}
     }
 
     # See if we need to check elsewhere for the file: 
@@ -505,6 +556,12 @@ if ($to_stdout) {
     }
 }
 
+
+my $comment = "Coords: $coord_string\nName: $name" .
+    "\nScale: ${field_width}x${field_height} arcmin" .
+    "\nData source: DSS2 color via hips2fits from CDS";
+
+print "Adding comment:\n\'$comment\'\n" if $verbose;
 
 # Execute the command.  Again, we use a function from LWP::Simple 
 # to fetch the image and save it in a file:
@@ -523,21 +580,24 @@ print STDERR  "Creating finding chart for object $name, output file"
 # Get the image dimensions in pixels:
 
 # First call the command line utility to get dimensions, and grep
-# out the line that gives the image geometry:
-my $image_dim_string = `identify -verbose $file`;
+# out the line that gives the image geometry, and pixels per inch in
+# the x direction:
+my $image_dim_string = `identify -format "%g %x %[units]" $file`;
 
 # That line should contain part of its output that looks like:
-#    Page geometry: 2376x2381+0+0
+#    2376x2381+0+0 72 PixelsPerInch
 # so split out those first two parts of the numeric string (groups of
 # digits separated by a 'x' and preceding a '+') then assign them to
 # width and height:
 
 my ($image_width, $image_height);
-if ($image_dim_string =~ m/Page geometry: *(\d+)x(\d+)\+/i) {
+if ($image_dim_string =~ m/(\d+)x(\d+)(?:\+\d+){2} (\d+) /i) {
     $image_width = $1;
     $image_height = $2;
+    $pixels_per_inch = $3;
     if ($verbose) {
 	print STDERR "Image height and width are: $image_width, $image_height \n";
+	print STDERR "x resolution is $pixels_per_inch\n";
     }
 } else {
     die "Could not parse output from 'identify' command; is "
@@ -558,8 +618,8 @@ my $pixels_per_arcmin = $image_width / $field_width;
 # for the field size:
 my $circle_radius = $initial_circle_radius * ($field_width / 21.);
 
-# Draw a 1-arcminute outer circle:
-my $circle_radius_outer = $pixels_per_arcmin;
+# Draw an outer circle as well:
+my $circle_radius_outer = $pixels_per_arcmin * $outer_circle_arcmin;
 
 
 if ($show_detector) {
@@ -646,9 +706,11 @@ my $circle_out_y2 = $image_mid_y;
 
 # and set up coords for a scale bar:
 my $scale_bar_length_pixels = $scale_bar_length * $pixels_per_arcmin;
-my $scale_bar_start = $image_width - 20 - $scale_bar_length_pixels;
+my $scale_bar_start = $image_width - 25 - $scale_bar_length_pixels;
 my $scale_bar_end = $scale_bar_start + $scale_bar_length_pixels;
-my $scale_bar_mid = $scale_bar_start + 0.5*$scale_bar_length_pixels;
+# Start the label just slightly before middle of scale bar so it is
+# more or less centered - that's why below is not 0.5.
+my $scale_bar_mid = $scale_bar_start + 0.45*$scale_bar_length_pixels;
 
 # Position for the lower label; if the image is big, it gets shifted
 # over too much and we need to compensate
@@ -689,9 +751,13 @@ if ($white_background) {
     $invert_string = " ";
 }
 
-# Get a rough pointsize that scales with field width, so it doesn't
-# end up looking too small:
-my $pointsize = sprintf("%d", ($field_width/10.) * 14);
+# Get a pointsize that scales with field width, so it doesn't
+# end up looking too small.  In addition to overall angular size, we
+# scale by the actual dimensions of the image as well, but using the
+# square root since the point size of the font scales its area.
+my $pointsize = sprintf("%0.1f", ($field_width/10.) * sqrt(2376/$image_width)
+			* sqrt($pixels_per_inch/72) 
+			* ($pixels_per_arcmin/50)**2 * 14);
 if ($verbose) {
     print STDERR "Point size is $pointsize\n";
 }
@@ -716,6 +782,7 @@ if ($verbose) {
 # by bit here, to make it easier to change one part if desired:
 
 my $convert_command = "convert $invert_string $jpeg_quality_string";
+$convert_command .= " -comment \'$comment\'";
 $convert_command .= " -font Helvetica -pointsize $pointsize";
 $convert_command .= " -fill $text_color -stroke $text_color -strokewidth 3"; 
 
@@ -768,13 +835,13 @@ $convert_command .= " -draw \"text 20,$bottom_y '$ra1 $ra2 $ra3 "
 $convert_command .= " -fill none -stroke $circle_color " .
     "-draw \"circle $image_mid_x,$image_mid_y $circle_out_x,$circle_out_y\"";
 
-# The 1 arcmin circle for scale:
+# The outer circle for scale:
 $convert_command .= " -strokewidth 2 -stroke $circle_color2 -draw " .
     "\"circle $image_mid_x,$image_mid_y $circle_out_x2,$circle_out_y2\"";
 
-# The legend about the 1 arcmin circle:
+# The legend about the outer circle:
 $convert_command .= "  -strokewidth 1 -fill $circle_color2 -draw \"text " .
-    "$label_start_x,$bottom_y 'Large circle is 1\\' radius'\"";
+    "$label_start_x,$bottom_y 'Large circle is ${outer_circle_arcmin}\\' radius'\"";
 
 # The commands to draw the detector and guider (which could be empty
 # strings if that option was not specified):
@@ -809,3 +876,51 @@ if (defined($sleep_seconds)) {
     sleep(abs($sleep_seconds));
 }
 
+
+sub RA_hms_to_deg {
+
+  # Convert input (3-element list of RA hours, minutes, seconds of time)
+  # to RA in degrees.  First convert to hours, then multiply by 15 to
+  # get degrees.
+
+  my($ra_hr, $ra_min, $ra_sec) = @_;
+
+  if (($ra_hr >= 24) or ($ra_min >= 60) or ($ra_sec >= 60)) {
+    die "At least one RA element out of range in RA_hms_to_deg: " .
+      "$ra_hr, $ra_min,$ra_sec\n"; 
+  }
+  my $ra_hr_total = $ra_hr + ($ra_min + ($ra_sec/60.))/60.;
+  my $ra_deg = $ra_hr_total * 15.;
+  return($ra_deg);
+}
+
+sub Dec_dms_to_deg {
+
+  # Convert input (3-element list of Dec degrees, arcminutes, arcseconds)
+  # to Dec in degrees.
+
+  my($dec_deg, $dec_min, $dec_sec) = @_;
+
+  if (($dec_deg >= 90) or ($dec_min >= 60) or ($dec_sec >= 60)) {
+    die "At least one DEC element out of range in DEC_dms_to_deg: " .
+      "$dec_deg, $dec_min,$dec_sec\n"; 
+  }
+  my $sign = 0;
+
+  # Get the declination sign.  Don't just compare numerically, because
+  # the degree field might be "-00".  Instead, do a string comparison to
+  # check for a minus sign at the beginning.  NOTE: if the variable with
+  # the input $dec_deg was "-00" but has been manipulated mathematically
+  # and assigned to (as opposed to string assignments) prior to being
+  # passed to the subroutine, it will not retain the leading "-".  Just
+  # in case, check it both ways - this gives the best chance of success.
+
+  if (($dec_deg < 0) or ($dec_deg =~ /^\s*-/)) {
+    $sign = -1;
+    $dec_deg = -1 * $dec_deg;
+  } else {
+    $sign = 1;
+  }
+  my $dec_deg_total = $dec_deg + ($dec_min + ($dec_sec/60.))/60.;
+  return($dec_deg_total*$sign);
+}
