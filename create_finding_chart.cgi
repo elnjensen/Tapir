@@ -31,6 +31,10 @@ use CGI::Cookie;
 use LWP::Simple;
 use Astro::Coords;
 use HTML::Entities;
+# Use IPC::Open2 (core module) to invoke get_finding_charts.pl
+# without passing arguments through a shell, avoiding any
+# possibility of shell metacharacter injection via user input:
+use IPC::Open2;
 
 use strict;
 use warnings;
@@ -75,8 +79,10 @@ if (($ra eq '') and ($target_input ne '')) {
     # No RA given, try to resolve name with Vizier:
     # First vet the name against a regular expression; since we pass
     # it back out in a URL, we want to be careful about what is in
-    # that string:
-    if ($target_input =~ m%\A([A-Za-z0-9\-\+\.\s\*\[\]\(\)\/\'\"]+)\Z%) {
+    # that string.  Use \x20 (literal space) rather than \s to
+    # exclude newlines and tabs, which could be exploited in shell
+    # commands.  Exclude quotes for the same reason.
+    if ($target_input =~ m%\A([A-Za-z0-9\-\+\.\x20\*\[\]\(\)\/]+)\Z%) {
 	$target_name = $1;
 	# Convert spaces in the name to underscores:
 	$target_name =~ s/ +/_/g;
@@ -114,7 +120,8 @@ if (($ra eq '') and ($target_input ne '')) {
 
 if (not defined $target_name) {
     if (defined $target_input) {
-	if ($target_input =~ m%\A([A-Za-z0-9\-\+\.\s\*\[\]\(\)\/\'\"]+)\Z%) {
+	# Same character validation as above; see comment there.
+	if ($target_input =~ m%\A([A-Za-z0-9\-\+\.\x20\*\[\]\(\)\/]+)\Z%) {
 	    $target_name = $1;
 	    # Get rid of double dots:
 	    $target_name =~ s/\.{2,}/\./g;
@@ -262,15 +269,56 @@ if ($invert) {
     $invert_string = "";
 }
 
-# At this point, we should have valid input, so get the image:
-my $command = "echo \"$target_name ,. $ra ,. $dec\" | "
-    . "./get_finding_charts.pl --directory \"/tmp\" --stdout --quiet "
-    . " --height=$field_height --width=$field_width $detector_string"
-    . " $invert_string";
-my $image = `$command`;
+# At this point, we should have valid input, so get the image.
+# We use IPC::Open2 to invoke get_finding_charts.pl directly
+# rather than via a shell command string.  This way, no user
+# input is ever interpreted by the shell, eliminating any
+# possibility of shell injection regardless of what characters
+# appear in $target_name or other variables.
 
-# Finally, print a header and print the image data:
+# Build the argument list for get_finding_charts.pl:
+my @cmd = ('./get_finding_charts.pl',
+	   '--directory', '/tmp',
+	   '--stdout', '--quiet',
+	   "--height=$field_height",
+	   "--width=$field_width",
+    );
 
+# Add optional arguments only if they are non-empty:
+if ($detector_string =~ /\S/) {
+    push @cmd, "--detector-width=$detector_width",
+               "--detector-height=$detector_height";
+}
+if ($invert) {
+    push @cmd, '--invert';
+}
+
+# Spawn the process; stdin/stdout are connected to $in/$out
+# handles, stderr goes to the web server error log:
+my $pid = open2(my $out, my $in, @cmd)
+    or fatal_error("Finding chart error",
+		   "Could not start finding chart process.");
+
+# Send the target data on stdin (the format expected by
+# get_finding_charts.pl when reading from a pipe):
+print $in "$target_name ,. $ra ,. $dec\n";
+close($in);
+
+# Read all of the image data from stdout:
+my $image = do { local $/; <$out> };
+close($out);
+
+# Reap the child process and check its exit status:
+waitpid($pid, 0);
+my $exit_status = $? >> 8;
+
+if ($exit_status != 0 || length($image) == 0) {
+    fatal_error("Finding chart error",
+		"Could not generate finding chart for this target."
+		. " The process exited with status $exit_status.");
+}
+
+# Success — print the image data:
 print $q->header(
 		 -type => "image/jpg",
 		 -cookie => \@cookies,
