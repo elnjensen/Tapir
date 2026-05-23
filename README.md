@@ -54,30 +54,7 @@ need this.  (Authentication for this has recently gotten very complicated - I'm 
 * `Tie::Handle::CSV`: If you use the script for parsing
 the exoplanets.org CSV file, you'll need this. 
 
-* `Date-Picker`: If you want to have a nice pop-up calendar widget for selecting dates
-in the interface for specifying the date range to be considered, you
-can download and install the `Date-Picker` widget from
-http://www.frequency-decoder.com/2009/09/09/unobtrusive-date-picker-widget-v5 
-
-The actual download link is toward the bottom of the page:
-http://www.frequency-decoder.com/demo/date-picker-v5/date-picker-v5.zip 
-
-There is a call to this in the supplied default input form, assuming
-it is installed in a subdirectory called `src` below the directory
-where the form is installed.  To use, just unpack the zip file into
-that `src` subdirectory, and make sure everything is readable by users
-of your webserver:
-`chmod -R o+rx src/`
-
-For my own installation, I also edited the file
-`src/date-picker-v5/js/lang/en.js` to make Sunday be displayed as the
-first day of the week: `firstDayOfWeek:6`  It was set to O (Monday) by
-default. 
-
-To use a different localization, change the call in the header of the
-input form to load a different language file from that subdirectory. 
-
-If you run the code for creating finding charts, you'll need the tools
+* If you run the code for creating finding charts, you'll need the tools
 `convert` and `identify` from `ImageMagick` to be installed and in your
 path. 
 
